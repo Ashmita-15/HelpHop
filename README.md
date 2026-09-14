@@ -291,6 +291,27 @@ Verifies the frontend compiles for production.
 
 ---
 
+## Troubleshooting
+
+**`The 'text-ink-700' class does not exist`** (or any other custom colour) in the Vite
+overlay — the dev server is holding a cached copy of `tailwind.config.js`. Tailwind
+config changes are not hot-reloaded. Stop the client dev server and start it again:
+
+```bash
+npm run dev --prefix client
+```
+
+**Port 5173 already in use** — Vite falls back to the next free port and prints it.
+If another project is already bound to `*:5173`, this one may bind `[::1]:5173`
+instead, and both will answer on `localhost`. Set an explicit port to avoid the
+clash:
+
+```bash
+PORT=5180 npm run dev --prefix client
+```
+
+---
+
 ## Notes and limitations
 
 - The seed script **deletes all existing users, opportunities and
