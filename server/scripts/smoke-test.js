@@ -523,6 +523,123 @@ try {
   const anonPdf = await fetch(`${BASE}/certificates/${cert.id}/download`);
   check('anonymous download → 401', anonPdf.status === 401, `got ${anonPdf.status}`);
 
+  console.log('\n▶ Past events are hidden from discovery');
+  const yesterday = new Date(Date.now() - 864e5);
+  const pastEvt = await call('/opportunities', {
+    method: 'POST', token: orgToken,
+    body: {
+      title: 'Last week litter pick', description: 'x'.repeat(60), category: 'Environment',
+      location: 'Howrah', date: yesterday.toISOString(), requiredVolunteers: 4, gig: { mode: 'none' },
+    },
+  });
+  check('an organization can still post a past-dated event → 201', pastEvt.status === 201, `got ${pastEvt.status}`);
+  const pastId = pastEvt.body.opportunity._id;
+
+  const defaultList = await call('/opportunities');
+  const defaultIds = defaultList.body.opportunities.map((o) => o._id);
+  check('default list hides a past event', !defaultIds.includes(pastId));
+  check('default list hides a completed event', !defaultIds.includes(evtId));
+
+  check(
+    'a future-dated event is still listed',
+    defaultIds.includes(futureId),
+    'the upcoming filter is excluding future events'
+  );
+
+  // The boundary that matters: an event dated TODAY must still be listed.
+  const todayEvt = await call('/opportunities', {
+    method: 'POST', token: orgToken,
+    body: {
+      title: 'Today at the shelter', description: 'x'.repeat(60), category: 'Animals',
+      location: 'Kolkata', date: new Date().toISOString(), requiredVolunteers: 4, gig: { mode: 'none' },
+    },
+  });
+  const todayId = todayEvt.body.opportunity._id;
+  const listWithToday = await call('/opportunities');
+  check(
+    "an event dated today is NOT treated as past",
+    listWithToday.body.opportunities.some((o) => o._id === todayId),
+    'today’s event vanished from the board'
+  );
+
+  const pastOnly = await call('/opportunities?when=past');
+  const pastIds = pastOnly.body.opportunities.map((o) => o._id);
+  check('?when=past returns the past event', pastIds.includes(pastId));
+  check('?when=past excludes upcoming events', !pastIds.includes(todayId));
+
+  const allList = await call('/opportunities?when=all');
+  const allIds = allList.body.opportunities.map((o) => o._id);
+  check('?when=all returns both', allIds.includes(pastId) && allIds.includes(todayId));
+
+  const mineList = await call('/opportunities?mine=true', { token: orgToken });
+  const mineIds = mineList.body.opportunities.map((o) => o._id);
+  check('mine=true still shows an org its past events', mineIds.includes(pastId));
+  check('mine=true still shows an org its completed events', mineIds.includes(evtId));
+
+  console.log('\n▶ Joining a finished event');
+  const joinPast = await call(`/opportunities/${pastId}/join`, { method: 'POST', token: volToken });
+  check('joining a past event → 409', joinPast.status === 409, `got ${joinPast.status}`);
+
+  const joinCompleted = await call(`/opportunities/${evtId}/join`, { method: 'POST', token: vol3.body.token });
+  check('joining a completed event → 409', joinCompleted.status === 409, `got ${joinCompleted.status}`);
+
+  const joinToday = await call(`/opportunities/${todayId}/join`, { method: 'POST', token: volToken });
+  check("an event dated today is still joinable → 201", joinToday.status === 201, `got ${joinToday.status}`);
+
+  console.log('\n▶ Volunteer dashboard splits upcoming from previous');
+  const split = await call('/users/dashboard', { token: volToken });
+  const upcomingIds = split.body.opportunities.map((o) => o._id);
+  const previousIds = (split.body.previous || []).map((o) => o._id);
+  check('today’s event is in `opportunities`', upcomingIds.includes(todayId));
+  check('a completed event moves to `previous`', previousIds.includes(evtId));
+  check('`opportunities` no longer contains finished events', !upcomingIds.includes(evtId));
+  check('stats.completed counts the previous list', split.body.stats.completed === previousIds.length,
+    `got ${split.body.stats.completed} vs ${previousIds.length}`);
+  check('stats.upcoming counts the upcoming list', split.body.stats.upcoming === upcomingIds.length);
+  check('totalJoined still counts everything',
+    split.body.stats.totalJoined === upcomingIds.length + previousIds.length);
+
+  const attendedEntry = (split.body.previous || []).find((o) => o._id === evtId);
+  check('a previous entry records attendance', attendedEntry?.attended === true);
+  check('a previous entry carries its certificate code', (attendedEntry?.certificateCode || '').length === 10,
+    `got ${attendedEntry?.certificateCode}`);
+  check('a previous entry carries its certificate id', !!attendedEntry?.certificateId);
+  check('a previous entry carries the gig and its status', attendedEntry?.gig?.amount === 500 && !!attendedEntry?.gig?.status);
+
+  // An absentee: join while the event is still open, then let it slip into the
+  // past (the only way a registration on a past event can legitimately exist).
+  const slipEvt = await call('/opportunities', {
+    method: 'POST', token: orgToken,
+    body: {
+      title: 'Shift that came and went', description: 'x'.repeat(60), category: 'Community',
+      location: 'Kolkata', date: new Date().toISOString(), requiredVolunteers: 4, gig: { mode: 'none' },
+    },
+  });
+  const slipId = slipEvt.body.opportunity._id;
+  const slipJoin = await call(`/opportunities/${slipId}/join`, { method: 'POST', token: vol3.body.token });
+  check('a volunteer can join it while it is still today → 201', slipJoin.status === 201, `got ${slipJoin.status}`);
+
+  const slipBack = await call(`/opportunities/${slipId}`, {
+    method: 'PUT', token: orgToken,
+    body: {
+      title: 'Shift that came and went', description: 'x'.repeat(60), category: 'Community',
+      location: 'Kolkata', date: new Date(Date.now() - 2 * 864e5).toISOString(),
+      requiredVolunteers: 4, gig: { mode: 'none' },
+    },
+  });
+  check('the organizer can move it into the past → 200', slipBack.status === 200, `got ${slipBack.status}`);
+
+  const absenteeDash = await call('/users/dashboard', { token: vol3.body.token });
+  const absenteeIds = absenteeDash.body.opportunities.map((o) => o._id);
+  check('a now-past event leaves the volunteer\u2019s upcoming list', !absenteeIds.includes(slipId));
+  const absenteeEntry = (absenteeDash.body.previous || []).find((o) => o._id === slipId);
+  check('an absentee’s previous entry says attended:false', absenteeEntry?.attended === false);
+  check('an absentee’s previous entry has no certificate', absenteeEntry?.certificateCode === null);
+
+  const orgDash2 = await call('/users/dashboard', { token: orgToken });
+  check('the organization dashboard still lists its past events',
+    orgDash2.body.opportunities.some((o) => o._id === pastId));
+
   console.log('\n▶ Ownership & deletion');
   const foreignEdit = await call(`/opportunities/${oppId}`, {
     method: 'PUT',

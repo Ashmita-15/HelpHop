@@ -6,6 +6,7 @@ import { useAuth } from '../context/AuthContext.jsx';
 import OpportunityCard from '../components/OpportunityCard.jsx';
 import {
   Alert,
+  Badge,
   CardSkeleton,
   EmptyState,
   Icon,
@@ -94,6 +95,62 @@ export default function OrganizationDashboard() {
 
   const { stats, opportunities } = data;
 
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+  const isPast = (o) => new Date(o.date) < startOfToday;
+
+  const needsCompleting = opportunities
+    .filter((o) => isPast(o) && !o.completedAt)
+    .sort((a, b) => new Date(b.date) - new Date(a.date));
+  const upcoming = opportunities
+    .filter((o) => !isPast(o) && !o.completedAt)
+    .sort((a, b) => new Date(a.date) - new Date(b.date));
+  const done = opportunities
+    .filter((o) => o.completedAt)
+    .sort((a, b) => new Date(b.date) - new Date(a.date));
+
+  const renderCard = (o) => (
+        <OpportunityCard
+          key={o._id}
+          opportunity={{ ...o, organizationId: { name: user.name } }}
+          footer={
+            <div className="flex flex-wrap items-center gap-1.5">
+              <button
+                type="button"
+                className="btn-outline btn-sm"
+                onClick={() => setViewing({ id: o._id, title: o.title })}
+              >
+                <Icon name="users" className="h-3.5 w-3.5" />
+                {o.registeredCount}
+              </button>
+              <Link to={`/opportunities/${o._id}/manage`} className="btn-secondary btn-sm">
+                <Icon name="qr" className="h-3.5 w-3.5" />
+                {o.completedAt ? 'Results' : 'Attendance'}
+              </Link>
+              {!o.completedAt && (
+                <Link to={`/opportunities/${o._id}/edit`} className="btn-outline btn-sm">
+                  <Icon name="edit" className="h-3.5 w-3.5" />
+                  Edit
+                </Link>
+              )}
+              <button
+                type="button"
+                className="btn-danger btn-sm ml-auto"
+                onClick={() => handleDelete(o)}
+                disabled={deletingId === o._id}
+              >
+                {deletingId === o._id ? (
+                  <Spinner className="h-3.5 w-3.5" />
+                ) : (
+                  <Icon name="trash" className="h-3.5 w-3.5" />
+                )}
+                {deletingId === o._id ? 'Deleting…' : 'Delete'}
+              </button>
+            </div>
+          }
+        />
+  );
+
   return (
     <div className="shell py-10 sm:py-12">
       <PageHeader
@@ -146,48 +203,42 @@ export default function OrganizationDashboard() {
             }
           />
         ) : (
-          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {opportunities.map((o) => (
-              <OpportunityCard
-                key={o._id}
-                opportunity={{ ...o, organizationId: { name: user.name } }}
-                footer={
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    <button
-                      type="button"
-                      className="btn-outline btn-sm"
-                      onClick={() => setViewing({ id: o._id, title: o.title })}
-                    >
-                      <Icon name="users" className="h-3.5 w-3.5" />
-                      {o.registeredCount}
-                    </button>
-                    <Link to={`/opportunities/${o._id}/manage`} className="btn-secondary btn-sm">
-                      <Icon name="qr" className="h-3.5 w-3.5" />
-                      {o.completedAt ? 'Results' : 'Attendance'}
-                    </Link>
-                    {!o.completedAt && (
-                      <Link to={`/opportunities/${o._id}/edit`} className="btn-outline btn-sm">
-                        <Icon name="edit" className="h-3.5 w-3.5" />
-                        Edit
-                      </Link>
-                    )}
-                    <button
-                      type="button"
-                      className="btn-danger btn-sm ml-auto"
-                      onClick={() => handleDelete(o)}
-                      disabled={deletingId === o._id}
-                    >
-                      {deletingId === o._id ? (
-                        <Spinner className="h-3.5 w-3.5" />
-                      ) : (
-                        <Icon name="trash" className="h-3.5 w-3.5" />
-                      )}
-                      {deletingId === o._id ? 'Deleting…' : 'Delete'}
-                    </button>
-                  </div>
-                }
-              />
-            ))}
+          <div className="space-y-10">
+            {needsCompleting.length > 0 && (
+              <section>
+                <div className="mb-4 flex flex-wrap items-center gap-2">
+                  <h2 className="text-lg font-semibold tracking-tight text-ink-900">
+                    Needs completing
+                  </h2>
+                  <Badge tone="amber">{needsCompleting.length}</Badge>
+                </div>
+                <p className="-mt-2 mb-4 text-sm text-ink-500">
+                  These events have happened. Take attendance and complete them so volunteers get
+                  their certificates.
+                </p>
+                <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                  {needsCompleting.map((o) => renderCard(o))}
+                </div>
+              </section>
+            )}
+
+            {upcoming.length > 0 && (
+              <section>
+                <h2 className="mb-4 text-lg font-semibold tracking-tight text-ink-900">Upcoming</h2>
+                <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                  {upcoming.map((o) => renderCard(o))}
+                </div>
+              </section>
+            )}
+
+            {done.length > 0 && (
+              <section>
+                <h2 className="mb-4 text-lg font-semibold tracking-tight text-ink-500">Completed</h2>
+                <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                  {done.map((o) => renderCard(o))}
+                </div>
+              </section>
+            )}
           </div>
         )}
       </div>

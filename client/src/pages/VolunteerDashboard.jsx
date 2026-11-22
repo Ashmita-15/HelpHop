@@ -5,6 +5,7 @@ import { api } from '../api/client.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import OpportunityCard from '../components/OpportunityCard.jsx';
 import VolunteerRewards from '../components/VolunteerRewards.jsx';
+import PreviousEvents from '../components/PreviousEvents.jsx';
 import {
   Alert,
   CardSkeleton,
@@ -56,7 +57,7 @@ export default function VolunteerDashboard() {
     );
   }
 
-  const { stats, opportunities } = data;
+  const { stats, opportunities, previous = [] } = data;
   const firstName = user.name.split(' ')[0];
 
   return (
@@ -73,7 +74,7 @@ export default function VolunteerDashboard() {
         }
       />
 
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-4 sm:grid-cols-3">
         <StatCard
           label="Opportunities joined"
           value={stats.totalJoined}
@@ -87,14 +88,25 @@ export default function VolunteerDashboard() {
           tone="ocean"
           hint="Dated today or later"
         />
+        <StatCard
+          label="Completed"
+          value={stats.completed ?? previous.length}
+          icon="certificate"
+          tone="neutral"
+          hint="Already happened"
+        />
       </div>
 
       <div className="mt-8">
         {opportunities.length === 0 ? (
           <EmptyState
             icon="heart"
-            title="You haven't joined anything yet"
-            message="Browse the board and claim a shift that fits your schedule. You can always check back here to see what's coming up."
+            title={previous.length ? 'Nothing coming up' : "You haven't joined anything yet"}
+            message={
+              previous.length
+                ? 'Your finished events are listed below. Browse the board to claim your next shift.'
+                : "Browse the board and claim a shift that fits your schedule. You can always check back here to see what's coming up."
+            }
             action={
               <Link to="/opportunities" className="btn-primary">
                 Browse opportunities
@@ -119,6 +131,8 @@ export default function VolunteerDashboard() {
           </div>
         )}
       </div>
+
+      <PreviousEvents events={previous} />
 
       <VolunteerRewards />
     </div>

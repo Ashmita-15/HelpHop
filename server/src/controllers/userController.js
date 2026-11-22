@@ -1,6 +1,10 @@
 import Opportunity from '../models/Opportunity.js';
 import Registration from '../models/Registration.js';
+import Attendance from '../models/Attendance.js';
+import Certificate from '../models/Certificate.js';
+import GigAward from '../models/GigAward.js';
 import { asyncHandler } from '../middleware/error.js';
+import { isFinished } from '../utils/dates.js';
 
 /** How many volunteers have signed up for each of the given opportunity ids. */
 async function countsByOpportunity(ids) {
@@ -35,7 +39,22 @@ export const dashboard = asyncHandler(async (req, res) => {
       .sort({ createdAt: -1 });
 
     const live = registrations.filter((r) => r.opportunityId); // may have been deleted
-    const countMap = await countsByOpportunity(live.map((r) => r.opportunityId._id));
+    const ids = live.map((r) => r.opportunityId._id);
+
+    // Everything the "previous" cards need, in three queries over the whole
+    // id set rather than three per event.
+    const [countMap, attendance, certificates, awards] = await Promise.all([
+      countsByOpportunity(ids),
+      Attendance.find({ volunteerId: req.user._id, opportunityId: { $in: ids } }).select(
+        'opportunityId'
+      ),
+      Certificate.find({ volunteerId: req.user._id, opportunityId: { $in: ids } }),
+      GigAward.find({ volunteerId: req.user._id, opportunityId: { $in: ids } }),
+    ]);
+
+    const attendedSet = new Set(attendance.map((a) => a.opportunityId.toString()));
+    const certMap = new Map(certificates.map((c) => [c.opportunityId.toString(), c]));
+    const awardMap = new Map(awards.map((a) => [a.opportunityId.toString(), a]));
 
     const joined = live.map((r) => ({
       ...withCounts(r.opportunityId.toObject(), countMap),
@@ -43,14 +62,42 @@ export const dashboard = asyncHandler(async (req, res) => {
       joined: true,
     }));
 
-    const now = Date.now();
+    const upcoming = joined.filter((o) => !isFinished(o));
+
+    // Finished events, most recent first, each carrying what came of it.
+    const previous = joined
+      .filter((o) => isFinished(o))
+      .sort((a, b) => new Date(b.date) - new Date(a.date))
+      .map((o) => {
+        const key = o._id.toString();
+        const cert = certMap.get(key);
+        const award = awardMap.get(key);
+        return {
+          ...o,
+          attended: attendedSet.has(key),
+          certificateId: cert?._id || null,
+          certificateCode: cert?.code || null,
+          gig: award
+            ? {
+                mode: award.mode,
+                amount: award.amount,
+                currency: award.currency,
+                perkTitle: award.perkTitle,
+                status: award.status,
+              }
+            : null,
+        };
+      });
+
     return res.json({
       role: 'volunteer',
       stats: {
         totalJoined: joined.length,
-        upcoming: joined.filter((o) => new Date(o.date).getTime() >= now).length,
+        upcoming: upcoming.length,
+        completed: previous.length,
       },
-      opportunities: joined,
+      opportunities: upcoming,
+      previous,
     });
   }
 

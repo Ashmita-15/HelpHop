@@ -83,6 +83,9 @@ export default function OpportunityDetail() {
   } = opportunity;
 
   const reward = gigLabel(gig);
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+  const finished = !!completedAt || new Date(date) < startOfToday;
   const isOwner = isOrganization && organizationId?._id === user?.id;
   const full = spotsLeft === 0;
 
@@ -194,7 +197,14 @@ export default function OpportunityDetail() {
 
         {/* Actions */}
         <div className="border-t border-ink-200/70 bg-ink-50/60 px-6 py-5 sm:px-8">
-          {!user && (
+          {finished && (
+            <p className="flex items-center gap-2 text-sm font-medium text-ink-500">
+              <Icon name="clock" className="h-4 w-4 text-ink-400" />
+              This event has finished.
+            </p>
+          )}
+
+          {!user && !finished && (
             <div className="flex flex-wrap items-center justify-between gap-3">
               <p className="text-sm text-ink-600">
                 Log in as a volunteer to claim a spot on this shift.
@@ -210,7 +220,21 @@ export default function OpportunityDetail() {
             </div>
           )}
 
+          {isVolunteer && finished && joined && (
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+              <p className="text-sm text-ink-600">
+                {attended
+                  ? 'You attended this event.'
+                  : 'You signed up, but were not marked present.'}
+              </p>
+              <Link to="/dashboard" className="btn-outline">
+                {attended ? 'View your certificate' : 'My dashboard'}
+              </Link>
+            </div>
+          )}
+
           {isVolunteer &&
+            !finished &&
             (joined ? (
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <p className="flex items-center gap-2 text-sm font-medium text-brand-700">

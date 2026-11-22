@@ -2,19 +2,8 @@ import { useEffect, useState } from 'react';
 
 import { api } from '../api/client.js';
 import { gigLabel } from '../lib/gig.js';
+import { certificateFilename, saveBlob } from '../lib/download.js';
 import { Alert, Badge, Icon, Spinner, formatDate } from './ui.jsx';
-
-/** Triggers a browser save of a PDF blob, then releases the object URL. */
-function saveBlob(blob, filename) {
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
-}
 
 /** A volunteer's earned gigs and certificates, shown under their dashboard. */
 export default function VolunteerRewards() {
@@ -37,7 +26,7 @@ export default function VolunteerRewards() {
     setDownloading(cert.id);
     try {
       const blob = await api.certificatePdf(cert.id);
-      saveBlob(blob, `volunteerconnect-certificate-${cert.code}.pdf`);
+      saveBlob(blob, certificateFilename(cert.code));
     } catch (err) {
       setError(err.message);
     } finally {

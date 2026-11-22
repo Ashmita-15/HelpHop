@@ -12,6 +12,7 @@ const EMPTY_FILTERS = { search: '', category: 'All', location: '' };
 export default function Browse() {
   const { isOrganization } = useAuth();
   const [filters, setFilters] = useState(EMPTY_FILTERS);
+  const hasFilters = Object.values(filters).some((v) => v && v !== 'All');
   const [opportunities, setOpportunities] = useState([]);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -103,12 +104,18 @@ export default function Browse() {
         ) : opportunities.length === 0 ? (
           <EmptyState
             icon="search"
-            title="Nothing matches that yet"
-            message="Try a broader keyword, a different category, or clear the filters to see everything on the board."
+            title={hasFilters ? 'Nothing matches that yet' : 'Nothing coming up right now'}
+            message={
+              hasFilters
+                ? 'Try a broader keyword, a different category, or clear the filters to see what else is on the board.'
+                : 'The board only shows events that are still to come. Check back soon — organizations post new shifts all the time.'
+            }
             action={
-              <button type="button" className="btn-outline" onClick={() => setFilters(EMPTY_FILTERS)}>
-                Clear filters
-              </button>
+              hasFilters ? (
+                <button type="button" className="btn-outline" onClick={() => setFilters(EMPTY_FILTERS)}>
+                  Clear filters
+                </button>
+              ) : null
             }
           />
         ) : (

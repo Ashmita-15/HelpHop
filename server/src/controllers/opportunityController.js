@@ -5,6 +5,7 @@ import Attendance from '../models/Attendance.js';
 import GigAward from '../models/GigAward.js';
 import Certificate from '../models/Certificate.js';
 import { asyncHandler, httpError } from '../middleware/error.js';
+import { startOfToday } from '../utils/dates.js';
 
 /** Escapes user input before putting it inside a RegExp. */
 const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -43,9 +44,9 @@ async function decorate(docs, viewer) {
   });
 }
 
-// GET /api/opportunities?search=&category=&location=&mine=true
+// GET /api/opportunities?search=&category=&location=&mine=true&when=upcoming|past|all
 export const listOpportunities = asyncHandler(async (req, res) => {
-  const { search, category, location, mine } = req.query;
+  const { search, category, location, mine, when = 'upcoming' } = req.query;
   const filter = {};
 
   if (search?.trim()) {
@@ -54,11 +55,27 @@ export const listOpportunities = asyncHandler(async (req, res) => {
   }
   if (category?.trim() && category !== 'All') filter.category = category;
   if (location?.trim()) filter.location = new RegExp(escapeRegex(location.trim()), 'i');
+
+  // An organization listing its own board always sees everything: past events
+  // are where it takes attendance and issues certificates.
+  const ownBoard = mine === 'true' && req.user?.role === 'organization';
   if (mine === 'true' && req.user) filter.organizationId = req.user._id;
+
+  let sort = { date: 1 }; // soonest first
+  if (!ownBoard) {
+    if (when === 'past') {
+      filter.date = { $lt: startOfToday() };
+      sort = { date: -1 }; // most recent first
+    } else if (when !== 'all') {
+      // Default: only what a volunteer can still turn up to.
+      filter.date = { $gte: startOfToday() };
+      filter.completedAt = null; // matches both unset and null
+    }
+  }
 
   const docs = await Opportunity.find(filter)
     .populate('organizationId', 'name email')
-    .sort({ date: 1 });
+    .sort(sort);
 
   res.json({ opportunities: await decorate(docs, req.user) });
 });
@@ -186,6 +203,11 @@ export const joinOpportunity = asyncHandler(async (req, res) => {
 
   const doc = await Opportunity.findById(req.params.id);
   if (!doc) throw httpError(404, 'Opportunity not found');
+
+  if (doc.completedAt) throw httpError(409, 'This event has been completed');
+  if (new Date(doc.date) < startOfToday()) {
+    throw httpError(409, 'This opportunity has already taken place');
+  }
 
   const already = await Registration.exists({
     volunteerId: req.user._id,
