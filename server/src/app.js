@@ -1,5 +1,8 @@
+
 import express from 'express';
 import cors from 'cors';
+
+import { connectDB } from './config/db.js';
 
 import authRoutes from './routes/auth.js';
 import opportunityRoutes from './routes/opportunities.js';
@@ -7,6 +10,7 @@ import userRoutes from './routes/users.js';
 import aiRoutes from './routes/ai.js';
 import gigRoutes from './routes/gigs.js';
 import certificateRoutes from './routes/certificates.js';
+
 import { notFound, errorHandler } from './middleware/error.js';
 
 export function createApp() {
@@ -20,9 +24,23 @@ export function createApp() {
   app.use(cors({ origin: origins }));
   app.use(express.json({ limit: '100kb' }));
 
-  app.get('/api/health', (_req, res) =>
-    res.json({ status: 'ok', ai: process.env.GEMINI_API_KEY ? 'gemini' : 'mock' })
-  );
+  // Health check does not require MongoDB.
+  app.get('/api/health', (_req, res) => {
+    res.json({
+      status: 'ok',
+      ai: process.env.GEMINI_API_KEY ? 'gemini' : 'mock'
+    });
+  });
+
+  // Connect to MongoDB before handling database-dependent routes.
+  app.use(async (_req, _res, next) => {
+    try {
+      await connectDB(process.env.MONGO_URI);
+      next();
+    } catch (error) {
+      next(error);
+    }
+  });
 
   app.use('/api/auth', authRoutes);
   app.use('/api/opportunities', opportunityRoutes);
@@ -36,3 +54,8 @@ export function createApp() {
 
   return app;
 }
+
+// Vercel requires the Express application as a default export.
+const app = createApp();
+
+export default app;
