@@ -259,11 +259,271 @@ try {
   check('organization dashboard lists own opportunity', orgDash.body?.opportunities?.length === 1);
   check('organization dashboard counts volunteers', orgDash.body?.stats?.totalVolunteers === 2);
 
-  console.log('\n▶ Ownership & deletion');
+  console.log('\n▶ Attendance (QR + manual)');
   const org2 = await call('/auth/register', {
     method: 'POST',
     body: { name: 'Other Org', email: 'org2@test.dev', password: 'password123', role: 'organization' },
   });
+  // A fresh event dated today, so the check-in window is open.
+  const today = new Date();
+  const evt = await call('/opportunities', {
+    method: 'POST',
+    token: orgToken,
+    body: {
+      title: 'Park Clean-Up Day',
+      description: 'x'.repeat(60),
+      category: 'Environment',
+      location: 'Kolkata',
+      date: today.toISOString(),
+      requiredVolunteers: 5,
+      gig: { mode: 'paid', amount: 500, currency: 'INR' },
+    },
+  });
+  check('create event with a paid gig → 201', evt.status === 201, `got ${evt.status}`);
+  check('gig is persisted', evt.body?.opportunity?.gig?.amount === 500 && evt.body.opportunity.gig.mode === 'paid');
+  check('checkinSecret is never exposed', !JSON.stringify(evt.body).includes('checkinSecret'));
+  const evtId = evt.body.opportunity._id;
+
+  const badGig = await call('/opportunities', {
+    method: 'POST',
+    token: orgToken,
+    body: {
+      title: 'Bad gig', description: 'x'.repeat(60), category: 'Environment', location: 'Kolkata',
+      date: today.toISOString(), requiredVolunteers: 2, gig: { mode: 'paid' },
+    },
+  });
+  check('paid gig without an amount → 400', badGig.status === 400, `got ${badGig.status}`);
+
+  const badPerk = await call('/opportunities', {
+    method: 'POST',
+    token: orgToken,
+    body: {
+      title: 'Bad perk', description: 'x'.repeat(60), category: 'Environment', location: 'Kolkata',
+      date: today.toISOString(), requiredVolunteers: 2, gig: { mode: 'perk' },
+    },
+  });
+  check('perk gig without a title → 400', badPerk.status === 400, `got ${badPerk.status}`);
+
+  // vol and vol2 join; vol3 stays away so we can prove absentees get nothing.
+  await call(`/opportunities/${evtId}/join`, { method: 'POST', token: volToken });
+  await call(`/opportunities/${evtId}/join`, { method: 'POST', token: vol2.body.token });
+
+  const tok = await call(`/opportunities/${evtId}/checkin-token`, { method: 'POST', token: orgToken });
+  check('org can mint a check-in token → 200', tok.status === 200, `got ${tok.status}`);
+  check('token response carries a QR data URL', (tok.body?.qrDataUrl || '').startsWith('data:image/png;base64,'));
+
+  const tokAsVol = await call(`/opportunities/${evtId}/checkin-token`, { method: 'POST', token: volToken });
+  check('volunteer cannot mint a token → 403', tokAsVol.status === 403, `got ${tokAsVol.status}`);
+
+  const foreignTok = await call(`/opportunities/${evtId}/checkin-token`, { method: 'POST', token: org2.body.token });
+  check('another org cannot mint a token → 403', foreignTok.status === 403, `got ${foreignTok.status}`);
+
+  const scan = await call(`/opportunities/${evtId}/checkin`, {
+    method: 'POST', token: volToken, body: { token: tok.body.token },
+  });
+  check('valid QR check-in → 201', scan.status === 201, `got ${scan.status}`);
+  check('check-in is recorded as qr', scan.body?.attendance?.method === 'qr');
+
+  const scanAgain = await call(`/opportunities/${evtId}/checkin`, {
+    method: 'POST', token: volToken, body: { token: tok.body.token },
+  });
+  check('duplicate check-in → 409', scanAgain.status === 409, `got ${scanAgain.status}`);
+
+  const forged = await call(`/opportunities/${evtId}/checkin`, {
+    method: 'POST', token: vol2.body.token, body: { token: 'bm90LWEtdG9rZW4' },
+  });
+  check('forged token → 401', forged.status === 401, `got ${forged.status}`);
+
+  const noTok = await call(`/opportunities/${evtId}/checkin`, { method: 'POST', token: vol2.body.token, body: {} });
+  check('missing token → 401', noTok.status === 401, `got ${noTok.status}`);
+
+  // A token minted for one event must not work on another.
+  const otherEvt = await call('/opportunities', {
+    method: 'POST', token: orgToken,
+    body: {
+      title: 'Other event', description: 'x'.repeat(60), category: 'Health', location: 'Pune',
+      date: today.toISOString(), requiredVolunteers: 3, gig: { mode: 'none' },
+    },
+  });
+  await call(`/opportunities/${otherEvt.body.opportunity._id}/join`, { method: 'POST', token: vol2.body.token });
+  const crossEvent = await call(`/opportunities/${otherEvt.body.opportunity._id}/checkin`, {
+    method: 'POST', token: vol2.body.token, body: { token: tok.body.token },
+  });
+  check("another event's token is rejected → 401", crossEvent.status === 401, `got ${crossEvent.status}`);
+
+  const unregistered = await call(`/opportunities/${evtId}/checkin`, {
+    method: 'POST', token: vol3.body.token, body: { token: tok.body.token },
+  });
+  check('unregistered volunteer cannot check in → 403', unregistered.status === 403, `got ${unregistered.status}`);
+
+  const futureEvt = await call('/opportunities', {
+    method: 'POST', token: orgToken,
+    body: {
+      title: 'Next month', description: 'x'.repeat(60), category: 'Education', location: 'Delhi',
+      date: new Date(Date.now() + 30 * 864e5).toISOString(), requiredVolunteers: 2, gig: { mode: 'none' },
+    },
+  });
+  const futureId = futureEvt.body.opportunity._id;
+  await call(`/opportunities/${futureId}/join`, { method: 'POST', token: volToken });
+  const futureTok = await call(`/opportunities/${futureId}/checkin-token`, { method: 'POST', token: orgToken });
+  const earlyScan = await call(`/opportunities/${futureId}/checkin`, {
+    method: 'POST', token: volToken, body: { token: futureTok.body.token },
+  });
+  check('check-in before the event day → 409', earlyScan.status === 409, `got ${earlyScan.status}`);
+
+  console.log('\n▶ Manual attendance');
+  const manual = await call(`/opportunities/${evtId}/attendance/${vol2.body.user?.id || vol2.body.user?._id}`, {
+    method: 'PATCH', token: orgToken, body: { present: true },
+  });
+  check('org can mark a volunteer present → 200', manual.status === 200, `got ${manual.status}`);
+
+  const roster = await call(`/opportunities/${evtId}/attendance`, { token: orgToken });
+  check('roster lists both registrants', roster.body?.roster?.length === 2, `got ${roster.body?.roster?.length}`);
+  check('roster counts 2 present', roster.body?.counts?.present === 2, `got ${roster.body?.counts?.present}`);
+  check('roster records both methods',
+    roster.body.roster.some((r) => r.method === 'qr') && roster.body.roster.some((r) => r.method === 'manual'));
+
+  const rosterAsVol = await call(`/opportunities/${evtId}/attendance`, { token: volToken });
+  check('volunteer cannot read the roster → 403', rosterAsVol.status === 403, `got ${rosterAsVol.status}`);
+
+  const unmark = await call(`/opportunities/${evtId}/attendance/${vol2.body.user?.id || vol2.body.user?._id}`, {
+    method: 'PATCH', token: orgToken, body: { present: false },
+  });
+  check('org can un-mark a volunteer → 200', unmark.status === 200, `got ${unmark.status}`);
+  check('un-marking drops the count to 1', unmark.body?.counts?.present === 1, `got ${unmark.body?.counts?.present}`);
+
+  // Put them back for the completion tests.
+  await call(`/opportunities/${evtId}/attendance/${vol2.body.user?.id || vol2.body.user?._id}`, {
+    method: 'PATCH', token: orgToken, body: { present: true },
+  });
+
+  const markAbsentee = await call(`/opportunities/${evtId}/attendance/${vol3.body.user?.id || vol3.body.user?._id}`, {
+    method: 'PATCH', token: orgToken, body: { present: true },
+  });
+  check('cannot mark someone who never joined → 404', markAbsentee.status === 404, `got ${markAbsentee.status}`);
+
+  const badBody = await call(`/opportunities/${evtId}/attendance/${vol2.body.user?.id || vol2.body.user?._id}`, {
+    method: 'PATCH', token: orgToken, body: { present: 'yes' },
+  });
+  check('non-boolean present → 400', badBody.status === 400, `got ${badBody.status}`);
+
+  console.log('\n▶ Completion → gigs + certificates');
+  const earlyComplete = await call(`/opportunities/${futureId}/complete`, { method: 'POST', token: orgToken });
+  check('completing before the event day → 409', earlyComplete.status === 409, `got ${earlyComplete.status}`);
+
+  const foreignComplete = await call(`/opportunities/${evtId}/complete`, { method: 'POST', token: org2.body.token });
+  check('another org cannot complete → 403', foreignComplete.status === 403, `got ${foreignComplete.status}`);
+
+  const done = await call(`/opportunities/${evtId}/complete`, { method: 'POST', token: orgToken });
+  check('owner can complete → 200', done.status === 200, `got ${done.status}`);
+  check('one award per attendee', done.body?.awards === 2, `got ${done.body?.awards}`);
+  check('one certificate per attendee', done.body?.certificates === 2, `got ${done.body?.certificates}`);
+
+  const again = await call(`/opportunities/${evtId}/complete`, { method: 'POST', token: orgToken });
+  check('completing twice is idempotent', again.status === 200 && again.body.awards === 2 && again.body.certificates === 2,
+    `got ${again.status} awards=${again.body?.awards} certs=${again.body?.certificates}`);
+  check('completedAt does not move', again.body.completedAt === done.body.completedAt);
+
+  const lateEdit = await call(`/opportunities/${evtId}`, {
+    method: 'PUT', token: orgToken,
+    body: {
+      title: 'Renamed', description: 'x'.repeat(60), category: 'Environment', location: 'Kolkata',
+      date: today.toISOString(), requiredVolunteers: 5, gig: { mode: 'paid', amount: 999 },
+    },
+  });
+  check('a completed event cannot be edited → 409', lateEdit.status === 409, `got ${lateEdit.status}`);
+
+  const lockedMark = await call(`/opportunities/${evtId}/attendance/${vol2.body.user?.id || vol2.body.user?._id}`, {
+    method: 'PATCH', token: orgToken, body: { present: false },
+  });
+  check('attendance locks after completion → 409', lockedMark.status === 409, `got ${lockedMark.status}`);
+
+  const lateScan = await call(`/opportunities/${evtId}/checkin`, {
+    method: 'POST', token: volToken, body: { token: tok.body.token },
+  });
+  check('check-in closes after completion → 409 or 401', [409, 401].includes(lateScan.status), `got ${lateScan.status}`);
+
+  // gig.mode 'none' → certificates but no awards.
+  await call(`/opportunities/${otherEvt.body.opportunity._id}/attendance/${vol2.body.user?.id || vol2.body.user?._id}`, {
+    method: 'PATCH', token: orgToken, body: { present: true },
+  });
+  const noneDone = await call(`/opportunities/${otherEvt.body.opportunity._id}/complete`, { method: 'POST', token: orgToken });
+  check("gig.mode 'none' issues no awards", noneDone.body?.awards === 0, `got ${noneDone.body?.awards}`);
+  check("gig.mode 'none' still issues certificates", noneDone.body?.certificates === 1, `got ${noneDone.body?.certificates}`);
+
+  console.log('\n▶ Gigs');
+  const myGigs = await call('/users/me/gigs', { token: volToken });
+  check('volunteer sees their gig', myGigs.body?.gigs?.length === 1, `got ${myGigs.body?.gigs?.length}`);
+  check('gig snapshots the amount', myGigs.body.gigs[0].amount === 500);
+  check('gig starts pending', myGigs.body.gigs[0].status === 'pending');
+  check('gig carries the event title', myGigs.body.gigs[0].opportunity?.title === 'Park Clean-Up Day');
+
+  const absenteeGigs = await call('/users/me/gigs', { token: vol3.body.token });
+  check('an absentee receives no gig', absenteeGigs.body?.gigs?.length === 0, `got ${absenteeGigs.body?.gigs?.length}`);
+
+  const orgGigs = await call(`/opportunities/${evtId}/gigs`, { token: orgToken });
+  check('org sees both gigs', orgGigs.body?.gigs?.length === 2, `got ${orgGigs.body?.gigs?.length}`);
+  const gigId = orgGigs.body.gigs[0].id;
+
+  const foreignSettle = await call(`/gigs/${gigId}`, {
+    method: 'PATCH', token: org2.body.token, body: { status: 'settled' },
+  });
+  check('another org cannot settle a gig → 403', foreignSettle.status === 403, `got ${foreignSettle.status}`);
+
+  const volSettle = await call(`/gigs/${gigId}`, { method: 'PATCH', token: volToken, body: { status: 'settled' } });
+  check('volunteer cannot settle their own gig → 403', volSettle.status === 403, `got ${volSettle.status}`);
+
+  const badStatus = await call(`/gigs/${gigId}`, { method: 'PATCH', token: orgToken, body: { status: 'paid-ish' } });
+  check('invalid gig status → 400', badStatus.status === 400, `got ${badStatus.status}`);
+
+  const settled = await call(`/gigs/${gigId}`, {
+    method: 'PATCH', token: orgToken, body: { status: 'settled', reference: 'UPI 8821' },
+  });
+  check('org can settle a gig → 200', settled.status === 200, `got ${settled.status}`);
+  check('settledAt is stamped', !!settled.body?.gig?.settledAt);
+  check('reference is stored', settled.body.gig.reference === 'UPI 8821');
+
+  console.log('\n▶ Certificates');
+  const myCerts = await call('/users/me/certificates', { token: volToken });
+  check('volunteer has 1 certificate', myCerts.body?.certificates?.length === 1, `got ${myCerts.body?.certificates?.length}`);
+  const cert = myCerts.body.certificates[0];
+  check('certificate code is 10 chars', cert?.code?.length === 10, `got ${cert?.code}`);
+  check('code avoids ambiguous letters', !/[ILOU]/.test(cert.code));
+  check('certificate carries a verify URL', (cert.verifyUrl || '').includes(cert.code));
+
+  const verified = await call(`/certificates/verify/${cert.code}`);
+  check('verify works with no token at all', verified.status === 200 && verified.body.valid === true, `got ${verified.status}`);
+  check('verify returns the volunteer name', verified.body.volunteerName === 'Test Volunteer');
+  check('verify returns the event title', verified.body.eventTitle === 'Park Clean-Up Day');
+  check('verify is case-insensitive', (await call(`/certificates/verify/${cert.code.toLowerCase()}`)).body?.valid === true);
+
+  const bogus = await call('/certificates/verify/ZZZZZZZZZZ');
+  check('unknown code → valid:false (not an error)', bogus.status === 200 && bogus.body.valid === false, `got ${bogus.status}`);
+  check('unknown code leaks no data', !bogus.body.volunteerName);
+
+  const pdfRes = await fetch(`${BASE}/certificates/${cert.id}/download`, {
+    headers: { Authorization: `Bearer ${volToken}` },
+  });
+  const pdfBuf = Buffer.from(await pdfRes.arrayBuffer());
+  check('certificate downloads → 200', pdfRes.status === 200, `got ${pdfRes.status}`);
+  check('response is a PDF', pdfRes.headers.get('content-type') === 'application/pdf');
+  check('PDF has a real header', pdfBuf.subarray(0, 5).toString() === '%PDF-');
+  check('PDF is non-trivial in size', pdfBuf.length > 2000, `got ${pdfBuf.length} bytes`);
+
+  const issuerPdf = await fetch(`${BASE}/certificates/${cert.id}/download`, {
+    headers: { Authorization: `Bearer ${orgToken}` },
+  });
+  check('issuing org can download it too', issuerPdf.status === 200, `got ${issuerPdf.status}`);
+
+  const strangerPdf = await fetch(`${BASE}/certificates/${cert.id}/download`, {
+    headers: { Authorization: `Bearer ${vol3.body.token}` },
+  });
+  check("a stranger cannot download someone's certificate → 403", strangerPdf.status === 403, `got ${strangerPdf.status}`);
+
+  const anonPdf = await fetch(`${BASE}/certificates/${cert.id}/download`);
+  check('anonymous download → 401', anonPdf.status === 401, `got ${anonPdf.status}`);
+
+  console.log('\n▶ Ownership & deletion');
   const foreignEdit = await call(`/opportunities/${oppId}`, {
     method: 'PUT',
     token: org2.body.token,
@@ -285,7 +545,11 @@ try {
   check('owner can delete → 200', del.status === 200, `got ${del.status}`);
 
   const afterDelete = await call('/users/dashboard', { token: volToken });
-  check('cascade removed the volunteer registration', afterDelete.body.opportunities.length === 0);
+  check(
+    'cascade removed the volunteer registration',
+    !afterDelete.body.opportunities.some((o) => o._id === oppId),
+    'the deleted opportunity still shows on the dashboard'
+  );
 
   const badToken = await call('/users/dashboard', { token: 'not.a.real.token' });
   check('garbage token → 401', badToken.status === 401, `got ${badToken.status}`);

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 
 import { api } from '../api/client.js';
-import OpportunityForm, { toDateInput } from '../components/OpportunityForm.jsx';
+import OpportunityForm, { gigToForm, toDateInput } from '../components/OpportunityForm.jsx';
 import { Alert, Icon, Loading, PageHeader } from '../components/ui.jsx';
 
 export default function EditOpportunity() {
@@ -24,6 +24,7 @@ export default function EditOpportunity() {
           location: o.location,
           date: toDateInput(o.date),
           requiredVolunteers: o.requiredVolunteers,
+          ...gigToForm(o.gig),
         })
       )
       .catch((err) => setError(err.message))

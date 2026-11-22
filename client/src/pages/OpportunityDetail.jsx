@@ -4,6 +4,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { api } from '../api/client.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { Alert, Badge, Icon, Loading, ProgressBar, Spinner, formatDate } from '../components/ui.jsx';
+import { gigLabel } from '../lib/gig.js';
 
 export default function OpportunityDetail() {
   const { id } = useParams();
@@ -76,8 +77,12 @@ export default function OpportunityDetail() {
     spotsLeft,
     organizationId,
     joined,
+    attended,
+    gig,
+    completedAt,
   } = opportunity;
 
+  const reward = gigLabel(gig);
   const isOwner = isOrganization && organizationId?._id === user?.id;
   const full = spotsLeft === 0;
 
@@ -118,7 +123,13 @@ export default function OpportunityDetail() {
                 You joined this
               </Badge>
             )}
-            {full && !joined && <Badge tone="amber">Full</Badge>}
+            {full && !joined && !completedAt && <Badge tone="amber">Full</Badge>}
+            {completedAt && <Badge tone="neutral">Completed</Badge>}
+            {attended && (
+              <Badge tone="brand" icon="check">
+                You attended
+              </Badge>
+            )}
           </div>
 
           <h1 className="text-2xl font-bold leading-tight tracking-tight text-ink-900 sm:text-3xl">
@@ -158,6 +169,27 @@ export default function OpportunityDetail() {
             </div>
             <ProgressBar value={registeredCount} max={requiredVolunteers} className="h-2" />
           </div>
+
+          {reward && (
+            <div className="mt-4 rounded-xl border border-brand-200 bg-brand-50/60 p-4">
+              <div className="flex items-start gap-3">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white text-brand-600 ring-1 ring-brand-200">
+                  <Icon name={gig.mode === 'paid' ? 'wallet' : 'gift'} className="h-4 w-4" />
+                </span>
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-ink-900">
+                    {gig.mode === 'paid' ? `${reward} per volunteer` : reward}
+                  </p>
+                  {gig.perkDescription && (
+                    <p className="mt-1 text-sm leading-relaxed text-ink-600">{gig.perkDescription}</p>
+                  )}
+                  <p className="mt-1 text-xs text-ink-500">
+                    Issued to everyone marked present, along with a certificate.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Actions */}

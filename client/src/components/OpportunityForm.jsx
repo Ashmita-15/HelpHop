@@ -20,7 +20,27 @@ export const emptyOpportunity = {
   location: '',
   date: '',
   requiredVolunteers: 10,
+  gigMode: 'none',
+  gigAmount: '',
+  gigCurrency: 'INR',
+  perkTitle: '',
+  perkDescription: '',
 };
+
+const GIG_MODES = [
+  { value: 'none', label: 'Nothing', hint: 'Volunteers take part for the cause alone' },
+  { value: 'paid', label: 'Payment', hint: 'A fixed amount per volunteer' },
+  { value: 'perk', label: 'Reward', hint: 'A voucher, kit, meal or other perk' },
+];
+
+/** Flattens the API's nested gig object into the flat shape this form edits. */
+export const gigToForm = (gig) => ({
+  gigMode: gig?.mode || 'none',
+  gigAmount: gig?.amount ?? '',
+  gigCurrency: gig?.currency || 'INR',
+  perkTitle: gig?.perkTitle || '',
+  perkDescription: gig?.perkDescription || '',
+});
 
 /** Turns an ISO date from the API into the yyyy-mm-dd a date input expects. */
 export const toDateInput = (value) => (value ? new Date(value).toISOString().slice(0, 10) : '');
@@ -72,6 +92,26 @@ export default function OpportunityForm({
     e.preventDefault();
     setError('');
 
+    let gig = { mode: 'none' };
+    if (form.gigMode === 'paid') {
+      const amount = Number(form.gigAmount);
+      if (!Number.isFinite(amount) || amount <= 0) {
+        setError('Enter how much each volunteer will be paid.');
+        return;
+      }
+      gig = { mode: 'paid', amount, currency: (form.gigCurrency || 'INR').toUpperCase() };
+    } else if (form.gigMode === 'perk') {
+      if (!form.perkTitle.trim()) {
+        setError('Give the reward a name, e.g. "Lunch + ₹200 travel voucher".');
+        return;
+      }
+      gig = {
+        mode: 'perk',
+        perkTitle: form.perkTitle.trim(),
+        perkDescription: form.perkDescription.trim(),
+      };
+    }
+
     const payload = {
       title: form.title.trim(),
       description: form.description.trim(),
@@ -79,6 +119,7 @@ export default function OpportunityForm({
       location: form.location.trim(),
       date: form.date,
       requiredVolunteers: Number(form.requiredVolunteers),
+      gig,
     };
 
     if (
@@ -254,6 +295,121 @@ export default function OpportunityForm({
             <Alert type="info" onDismiss={() => setAiNote('')}>
               {aiNote}
             </Alert>
+          </div>
+        )}
+      </section>
+
+      {/* ------------------------------------------------------------- gig */}
+      <section className="card p-5 sm:p-6">
+        <h2 className="text-base font-semibold text-ink-900">What volunteers get</h2>
+        <p className="mt-1 text-sm text-ink-500">
+          Issued automatically to everyone marked present when you complete the event. Everyone who
+          attends receives a certificate either way.
+        </p>
+
+        <fieldset className="mt-5">
+          <legend className="sr-only">Reward type</legend>
+          <div className="grid gap-3 sm:grid-cols-3">
+            {GIG_MODES.map((mode) => {
+              const active = form.gigMode === mode.value;
+              return (
+                <label
+                  key={mode.value}
+                  className={`cursor-pointer rounded-xl border p-4 transition ${
+                    active
+                      ? 'border-brand-500 bg-brand-50/60 ring-1 ring-brand-500'
+                      : 'border-ink-200 hover:border-ink-300 hover:bg-ink-50/60'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="gigMode"
+                    value={mode.value}
+                    checked={active}
+                    onChange={set('gigMode')}
+                    className="sr-only"
+                  />
+                  <span className="flex items-center gap-2 text-sm font-semibold text-ink-900">
+                    {mode.value !== 'none' && (
+                      <Icon
+                        name={mode.value === 'paid' ? 'wallet' : 'gift'}
+                        className={`h-4 w-4 ${active ? 'text-brand-600' : 'text-ink-400'}`}
+                      />
+                    )}
+                    {mode.label}
+                  </span>
+                  <span className="mt-1 block text-xs leading-relaxed text-ink-500">{mode.hint}</span>
+                </label>
+              );
+            })}
+          </div>
+        </fieldset>
+
+        {form.gigMode === 'paid' && (
+          <div className="mt-5 grid gap-5 sm:grid-cols-[1fr_8rem]">
+            <div>
+              <label className="label" htmlFor="gigAmount">
+                Amount per volunteer
+              </label>
+              <input
+                id="gigAmount"
+                type="number"
+                min="1"
+                step="1"
+                className="input"
+                placeholder="500"
+                value={form.gigAmount}
+                onChange={set('gigAmount')}
+              />
+            </div>
+            <div>
+              <label className="label" htmlFor="gigCurrency">
+                Currency
+              </label>
+              <input
+                id="gigCurrency"
+                className="input uppercase"
+                maxLength={3}
+                value={form.gigCurrency}
+                onChange={set('gigCurrency')}
+              />
+            </div>
+            <p className="hint sm:col-span-2">
+              VolunteerConnect records what you owe and tracks it as paid — it never handles the
+              money itself. You pay volunteers your usual way.
+            </p>
+          </div>
+        )}
+
+        {form.gigMode === 'perk' && (
+          <div className="mt-5 space-y-5">
+            <div>
+              <label className="label" htmlFor="perkTitle">
+                Reward
+              </label>
+              <input
+                id="perkTitle"
+                className="input"
+                placeholder="e.g. Lunch + ₹200 travel voucher"
+                maxLength={120}
+                value={form.perkTitle}
+                onChange={set('perkTitle')}
+              />
+            </div>
+            <div>
+              <label className="label" htmlFor="perkDescription">
+                Details <span className="font-normal text-ink-400">(optional)</span>
+              </label>
+              <textarea
+                id="perkDescription"
+                rows={3}
+                className="input resize-y"
+                placeholder="How volunteers claim it, when it's handed over, anything they should bring…"
+                maxLength={1000}
+                value={form.perkDescription}
+                onChange={set('perkDescription')}
+              />
+            </div>
           </div>
         )}
       </section>

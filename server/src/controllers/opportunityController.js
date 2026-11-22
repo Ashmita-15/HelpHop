@@ -1,6 +1,9 @@
 import mongoose from 'mongoose';
-import Opportunity, { CATEGORIES } from '../models/Opportunity.js';
+import Opportunity, { CATEGORIES, GIG_MODES } from '../models/Opportunity.js';
 import Registration from '../models/Registration.js';
+import Attendance from '../models/Attendance.js';
+import GigAward from '../models/GigAward.js';
+import Certificate from '../models/Certificate.js';
 import { asyncHandler, httpError } from '../middleware/error.js';
 
 /** Escapes user input before putting it inside a RegExp. */
@@ -17,12 +20,14 @@ async function decorate(docs, viewer) {
   const countMap = new Map(counts.map((c) => [c._id.toString(), c.count]));
 
   let joinedSet = new Set();
+  let attendedSet = new Set();
   if (viewer?.role === 'volunteer') {
-    const mine = await Registration.find({
-      volunteerId: viewer._id,
-      opportunityId: { $in: ids },
-    }).select('opportunityId');
+    const [mine, attended] = await Promise.all([
+      Registration.find({ volunteerId: viewer._id, opportunityId: { $in: ids } }).select('opportunityId'),
+      Attendance.find({ volunteerId: viewer._id, opportunityId: { $in: ids } }).select('opportunityId'),
+    ]);
     joinedSet = new Set(mine.map((r) => r.opportunityId.toString()));
+    attendedSet = new Set(attended.map((a) => a.opportunityId.toString()));
   }
 
   return docs.map((d) => {
@@ -33,6 +38,7 @@ async function decorate(docs, viewer) {
       registeredCount,
       spotsLeft: Math.max(0, obj.requiredVolunteers - registeredCount),
       joined: joinedSet.has(d._id.toString()),
+      attended: attendedSet.has(d._id.toString()),
     };
   });
 }
@@ -68,6 +74,40 @@ export const getOpportunity = asyncHandler(async (req, res) => {
   res.json({ opportunity: decorated });
 });
 
+/**
+ * Validates the gig an organization attaches to an event.
+ * 'paid' is a record of what the org promises to pay outside the app — no
+ * payment details are accepted or stored anywhere.
+ */
+function readGig(raw) {
+  const mode = (raw?.mode || 'none').trim();
+  if (!GIG_MODES.includes(mode)) {
+    throw httpError(400, `Gig mode must be one of: ${GIG_MODES.join(', ')}`);
+  }
+
+  if (mode === 'paid') {
+    const amount = Number(raw.amount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      throw httpError(400, 'A paid gig needs an amount greater than 0');
+    }
+    const currency = (raw.currency || 'INR').trim().toUpperCase();
+    if (!/^[A-Z]{3}$/.test(currency)) throw httpError(400, 'Currency must be a 3-letter code');
+    return { mode, amount, currency };
+  }
+
+  if (mode === 'perk') {
+    const perkTitle = (raw.perkTitle || '').trim();
+    if (!perkTitle) throw httpError(400, 'A perk gig needs a title');
+    return {
+      mode,
+      perkTitle: perkTitle.slice(0, 120),
+      perkDescription: (raw.perkDescription || '').trim().slice(0, 1000),
+    };
+  }
+
+  return { mode: 'none' };
+}
+
 function readOpportunityBody(body) {
   const title = (body.title || '').trim();
   const description = (body.description || '').trim();
@@ -87,7 +127,7 @@ function readOpportunityBody(body) {
     throw httpError(400, 'Required volunteers must be a whole number of at least 1');
   }
 
-  return { title, description, category, location, date, requiredVolunteers };
+  return { title, description, category, location, date, requiredVolunteers, gig: readGig(body.gig) };
 }
 
 // POST /api/opportunities  (organization only)
@@ -115,6 +155,9 @@ async function findOwned(id, user) {
 // PUT /api/opportunities/:id
 export const updateOpportunity = asyncHandler(async (req, res) => {
   const doc = await findOwned(req.params.id, req.user);
+  if (doc.completedAt) {
+    throw httpError(409, 'This event has been completed and can no longer be edited');
+  }
   Object.assign(doc, readOpportunityBody(req.body));
   await doc.save();
   await doc.populate('organizationId', 'name email');
@@ -126,7 +169,12 @@ export const updateOpportunity = asyncHandler(async (req, res) => {
 // DELETE /api/opportunities/:id
 export const deleteOpportunity = asyncHandler(async (req, res) => {
   const doc = await findOwned(req.params.id, req.user);
-  await Registration.deleteMany({ opportunityId: doc._id });
+  await Promise.all([
+    Registration.deleteMany({ opportunityId: doc._id }),
+    Attendance.deleteMany({ opportunityId: doc._id }),
+    GigAward.deleteMany({ opportunityId: doc._id }),
+    Certificate.deleteMany({ opportunityId: doc._id }),
+  ]);
   await doc.deleteOne();
 
   res.json({ message: 'Opportunity deleted' });

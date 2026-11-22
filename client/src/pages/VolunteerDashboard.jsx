@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { api } from '../api/client.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import OpportunityCard from '../components/OpportunityCard.jsx';
+import VolunteerRewards from '../components/VolunteerRewards.jsx';
 import {
   Alert,
   CardSkeleton,
@@ -118,6 +119,8 @@ export default function VolunteerDashboard() {
           </div>
         )}
       </div>
+
+      <VolunteerRewards />
     </div>
   );
 }

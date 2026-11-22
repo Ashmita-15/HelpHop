@@ -96,6 +96,41 @@ export function Icon({ name, className = 'h-4 w-4' }) {
         <path d="m15.5 8.5-2 5-5 2 2-5 5-2Z" />
       </>
     ),
+    qr: (
+      <>
+        <rect x="3" y="3" width="7" height="7" rx="1" />
+        <rect x="14" y="3" width="7" height="7" rx="1" />
+        <rect x="3" y="14" width="7" height="7" rx="1" />
+        <path d="M14 14h3v3h-3zM19 19h2M14 21h3M21 14v3" />
+      </>
+    ),
+    gift: (
+      <>
+        <path d="M20 12v9H4v-9M2 7h20v5H2zM12 21V7" />
+        <path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7ZM12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7Z" />
+      </>
+    ),
+    wallet: (
+      <>
+        <path d="M3 7a2 2 0 0 1 2-2h13a1 1 0 0 1 1 1v2" />
+        <path d="M3 7v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7a1 1 0 0 0-1-1H5a2 2 0 0 1-2-2Z" />
+        <circle cx="16.5" cy="13.5" r="1" />
+      </>
+    ),
+    certificate: (
+      <>
+        <path d="M15 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h7" />
+        <path d="M8 7h7M8 11h5" />
+        <circle cx="17" cy="15" r="3.5" />
+        <path d="m15.5 18-.5 3.5 2-1 2 1-.5-3.5" />
+      </>
+    ),
+    download: (
+      <>
+        <path d="M12 3v12M7 11l5 5 5-5" />
+        <path d="M5 20h14" />
+      </>
+    ),
   };
 
   return (

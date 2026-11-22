@@ -13,6 +13,9 @@ import OpportunityDetail from './pages/OpportunityDetail.jsx';
 import Dashboard from './pages/Dashboard.jsx';
 import CreateOpportunity from './pages/CreateOpportunity.jsx';
 import EditOpportunity from './pages/EditOpportunity.jsx';
+import ManageEvent from './pages/ManageEvent.jsx';
+import Checkin from './pages/Checkin.jsx';
+import VerifyCertificate from './pages/VerifyCertificate.jsx';
 import NotFound from './pages/NotFound.jsx';
 
 export default function App() {
@@ -28,6 +31,7 @@ export default function App() {
           <Route path="/opportunities" element={<Browse />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
+          <Route path="/verify/:code" element={<VerifyCertificate />} />
 
           {/* Organizations only — declared before /:id so "new" isn't read as an id */}
           <Route
@@ -47,7 +51,26 @@ export default function App() {
             }
           />
 
+          <Route
+            path="/opportunities/:id/manage"
+            element={
+              <ProtectedRoute role="organization">
+                <ManageEvent />
+              </ProtectedRoute>
+            }
+          />
+
           <Route path="/opportunities/:id" element={<OpportunityDetail />} />
+
+          {/* Where a scanned event QR lands */}
+          <Route
+            path="/checkin/:id"
+            element={
+              <ProtectedRoute role="volunteer">
+                <Checkin />
+              </ProtectedRoute>
+            }
+          />
 
           {/* Any logged-in user */}
           <Route

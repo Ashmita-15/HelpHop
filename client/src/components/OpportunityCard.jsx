@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { Badge, Icon, ProgressBar, formatDate } from './ui.jsx';
+import { gigLabel, gigTone } from '../lib/gig.js';
 
 /**
  * Summary card used on the landing page, the explore grid and both dashboards.
@@ -16,9 +17,12 @@ export default function OpportunityCard({ opportunity, footer }) {
     registeredCount = 0,
     organizationId,
     joined,
+    gig,
+    completedAt,
   } = opportunity;
 
   const orgName = organizationId?.name || 'An organization';
+  const reward = gigLabel(gig);
   const full = registeredCount >= requiredVolunteers;
   const spotsLeft = Math.max(0, requiredVolunteers - registeredCount);
 
@@ -32,7 +36,13 @@ export default function OpportunityCard({ opportunity, footer }) {
               Joined
             </Badge>
           )}
-          {full && !joined && <Badge tone="amber">Full</Badge>}
+          {full && !joined && !completedAt && <Badge tone="amber">Full</Badge>}
+          {completedAt && <Badge tone="neutral">Completed</Badge>}
+          {reward && (
+            <Badge tone={gigTone(gig)} icon={gig.mode === 'paid' ? 'wallet' : 'gift'}>
+              {reward}
+            </Badge>
+          )}
         </div>
 
         <h3 className="text-lg font-semibold leading-snug tracking-tight text-ink-900 transition-colors duration-200 group-hover:text-brand-700">

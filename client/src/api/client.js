@@ -73,6 +73,32 @@ export const api = {
   listVolunteers: (id) => request(`/opportunities/${id}/volunteers`),
   categories: () => request('/opportunities/categories', { auth: false }),
 
+  // Attendance
+  checkinToken: (id) => request(`/opportunities/${id}/checkin-token`, { method: 'POST' }),
+  checkin: (id, token) => request(`/opportunities/${id}/checkin`, { method: 'POST', body: { token } }),
+  attendance: (id) => request(`/opportunities/${id}/attendance`),
+  markAttendance: (id, volunteerId, present) =>
+    request(`/opportunities/${id}/attendance/${volunteerId}`, { method: 'PATCH', body: { present } }),
+  completeOpportunity: (id) => request(`/opportunities/${id}/complete`, { method: 'POST' }),
+
+  // Gigs
+  opportunityGigs: (id) => request(`/opportunities/${id}/gigs`),
+  myGigs: () => request('/users/me/gigs'),
+  updateGig: (gigId, payload) => request(`/gigs/${gigId}`, { method: 'PATCH', body: payload }),
+
+  // Certificates
+  myCertificates: () => request('/users/me/certificates'),
+  verifyCertificate: (code) => request(`/certificates/verify/${code}`, { auth: false }),
+  /** Fetches the PDF with the auth header, then hands back a blob for saving. */
+  certificatePdf: async (certificateId) => {
+    const token = getToken();
+    const res = await fetch(`${BASE_URL}/certificates/${certificateId}/download`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!res.ok) throw new ApiError('Could not download that certificate', res.status);
+    return res.blob();
+  },
+
   // Dashboard + AI
   dashboard: () => request('/users/dashboard'),
   generateDescription: (payload) =>

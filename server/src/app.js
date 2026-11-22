@@ -5,6 +5,8 @@ import authRoutes from './routes/auth.js';
 import opportunityRoutes from './routes/opportunities.js';
 import userRoutes from './routes/users.js';
 import aiRoutes from './routes/ai.js';
+import gigRoutes from './routes/gigs.js';
+import certificateRoutes from './routes/certificates.js';
 import { notFound, errorHandler } from './middleware/error.js';
 
 export function createApp() {
@@ -26,6 +28,8 @@ export function createApp() {
   app.use('/api/opportunities', opportunityRoutes);
   app.use('/api/users', userRoutes);
   app.use('/api/ai', aiRoutes);
+  app.use('/api/gigs', gigRoutes);
+  app.use('/api/certificates', certificateRoutes);
 
   app.use(notFound);
   app.use(errorHandler);

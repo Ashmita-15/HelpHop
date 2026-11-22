@@ -12,7 +12,10 @@ export default function ProtectedRoute({ role, children }) {
 
   if (loading) return <Loading label="Checking your session…" />;
 
-  if (!user) return <Navigate to="/login" state={{ from: location.pathname }} replace />;
+  // Keep the query string: a scanned check-in link carries its token there.
+  if (!user) {
+    return <Navigate to="/login" state={{ from: location.pathname + location.search }} replace />;
+  }
 
   if (role && user.role !== role) return <Navigate to="/dashboard" replace />;
 

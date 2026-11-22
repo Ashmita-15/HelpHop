@@ -161,10 +161,16 @@ export default function OrganizationDashboard() {
                       <Icon name="users" className="h-3.5 w-3.5" />
                       {o.registeredCount}
                     </button>
-                    <Link to={`/opportunities/${o._id}/edit`} className="btn-outline btn-sm">
-                      <Icon name="edit" className="h-3.5 w-3.5" />
-                      Edit
+                    <Link to={`/opportunities/${o._id}/manage`} className="btn-secondary btn-sm">
+                      <Icon name="qr" className="h-3.5 w-3.5" />
+                      {o.completedAt ? 'Results' : 'Attendance'}
                     </Link>
+                    {!o.completedAt && (
+                      <Link to={`/opportunities/${o._id}/edit`} className="btn-outline btn-sm">
+                        <Icon name="edit" className="h-3.5 w-3.5" />
+                        Edit
+                      </Link>
+                    )}
                     <button
                       type="button"
                       className="btn-danger btn-sm ml-auto"

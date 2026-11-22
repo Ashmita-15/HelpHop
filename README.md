@@ -93,6 +93,7 @@ so both dashboards have content on first run.
 | Variable | Required | Default | Purpose |
 | --- | --- | --- | --- |
 | `PORT` | no | `5000` | Port the API listens on |
+| `HOST` | no | _(127.0.0.1 and ::1)_ | Bind a single address instead of both loopback addresses |
 | `MONGO_URI` | **yes** | `mongodb://127.0.0.1:27017/volunteerconnect` | MongoDB connection string (local or Atlas) |
 | `JWT_SECRET` | **yes** | — | Secret used to sign JWTs. The server refuses to start without it |
 | `JWT_EXPIRES_IN` | no | `7d` | Token lifetime |
@@ -309,6 +310,19 @@ clash:
 ```bash
 PORT=5180 npm run dev --prefix client
 ```
+
+**`EADDRINUSE` on port 5000 (macOS)** — macOS's AirPlay Receiver (process
+`ControlCenter`, `Server: AirTunes`) listens on `*:5000`. The API therefore binds
+`127.0.0.1:5000` and `[::1]:5000` rather than all interfaces; those more specific
+addresses are free and win for local traffic, so `http://localhost:5000` reaches
+the API without touching Control Center. If you still see `EADDRINUSE`, a
+suspended dev server (from `Ctrl+Z`) is the usual culprit:
+
+```bash
+lsof -nP -iTCP:5000 -sTCP:LISTEN
+```
+
+Resume it with `fg` and stop it with `Ctrl+C`, or run `kill %1` from the same terminal.
 
 ---
 
