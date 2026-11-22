@@ -4,8 +4,9 @@ import Registration from '../models/Registration.js';
 import Attendance from '../models/Attendance.js';
 import GigAward from '../models/GigAward.js';
 import Certificate from '../models/Certificate.js';
+import OpportunityImage from '../models/OpportunityImage.js';
 import { asyncHandler, httpError } from '../middleware/error.js';
-import { startOfToday } from '../utils/dates.js';
+import { endOfToday, hasEnded, resolveEventWindow, startOfToday } from '../utils/dates.js';
 
 /** Escapes user input before putting it inside a RegExp. */
 const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -61,15 +62,23 @@ export const listOpportunities = asyncHandler(async (req, res) => {
   const ownBoard = mine === 'true' && req.user?.role === 'organization';
   if (mine === 'true' && req.user) filter.organizationId = req.user._id;
 
+  // Whether an event is over depends on its end time, not just its date, so
+  // the database filter is deliberately a superset — it narrows by calendar
+  // day, and hasEnded() makes the exact call below. Without the widening,
+  // an event that finished at 13:00 today would be missing from both lists.
   let sort = { date: 1 }; // soonest first
+  let refine = null;
+
   if (!ownBoard) {
     if (when === 'past') {
-      filter.date = { $lt: startOfToday() };
+      filter.date = { $lte: endOfToday() };
       sort = { date: -1 }; // most recent first
+      refine = (o) => hasEnded(o);
     } else if (when !== 'all') {
-      // Default: only what a volunteer can still turn up to.
+      // Default: only what a volunteer could still turn up to.
       filter.date = { $gte: startOfToday() };
       filter.completedAt = null; // matches both unset and null
+      refine = (o) => !hasEnded(o);
     }
   }
 
@@ -77,7 +86,8 @@ export const listOpportunities = asyncHandler(async (req, res) => {
     .populate('organizationId', 'name email')
     .sort(sort);
 
-  res.json({ opportunities: await decorate(docs, req.user) });
+  const visible = refine ? docs.filter(refine) : docs;
+  res.json({ opportunities: await decorate(visible, req.user) });
 });
 
 // GET /api/opportunities/:id
@@ -168,6 +178,18 @@ function readOpportunityBody(body) {
     throw httpError(400, 'Required volunteers must be a whole number of at least 1');
   }
 
+  const whenAndWhere = readWhenAndWhere(body);
+
+  // Resolve the calendar day and the wall clock into real instants once, here,
+  // so nothing downstream has to guess at a timezone. `body.date` is still the
+  // raw 'YYYY-MM-DD' the client sent, which is unambiguous.
+  const window = resolveEventWindow({
+    date: body.date,
+    startTime: whenAndWhere.startTime,
+    endTime: whenAndWhere.endTime,
+    tzOffsetMinutes: body.tzOffsetMinutes,
+  });
+
   return {
     title,
     description,
@@ -176,7 +198,8 @@ function readOpportunityBody(body) {
     date,
     requiredVolunteers,
     gig: readGig(body.gig),
-    ...readWhenAndWhere(body),
+    ...whenAndWhere,
+    ...window,
   };
 }
 
@@ -224,6 +247,7 @@ export const deleteOpportunity = asyncHandler(async (req, res) => {
     Attendance.deleteMany({ opportunityId: doc._id }),
     GigAward.deleteMany({ opportunityId: doc._id }),
     Certificate.deleteMany({ opportunityId: doc._id }),
+    OpportunityImage.deleteOne({ opportunityId: doc._id }),
   ]);
   await doc.deleteOne();
 
@@ -238,9 +262,7 @@ export const joinOpportunity = asyncHandler(async (req, res) => {
   if (!doc) throw httpError(404, 'Opportunity not found');
 
   if (doc.completedAt) throw httpError(409, 'This event has been completed');
-  if (new Date(doc.date) < startOfToday()) {
-    throw httpError(409, 'This opportunity has already taken place');
-  }
+  if (hasEnded(doc)) throw httpError(409, 'This opportunity has already taken place');
 
   const already = await Registration.exists({
     volunteerId: req.user._id,

@@ -16,6 +16,7 @@ import CreateOpportunity from './pages/CreateOpportunity.jsx';
 import EditOpportunity from './pages/EditOpportunity.jsx';
 import ManageEvent from './pages/ManageEvent.jsx';
 import Checkin from './pages/Checkin.jsx';
+import CheckinPicker from './pages/CheckinPicker.jsx';
 import VerifyCertificate from './pages/VerifyCertificate.jsx';
 import NotFound from './pages/NotFound.jsx';
 
@@ -63,6 +64,16 @@ export default function App() {
           />
 
           <Route path="/opportunities/:id" element={<OpportunityDetail />} />
+
+          {/* Standing entry point: "I'm at an event, mark me present" */}
+          <Route
+            path="/checkin"
+            element={
+              <ProtectedRoute role="volunteer">
+                <CheckinPicker />
+              </ProtectedRoute>
+            }
+          />
 
           {/* Where a scanned event QR lands */}
           <Route

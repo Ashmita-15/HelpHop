@@ -162,13 +162,15 @@ export function Icon({ name, className = 'h-4 w-4' }) {
 /* ------------------------------------------------------------ photography */
 
 /**
- * A photograph. Always cropped server-side to the ratio it will occupy, so
- * nothing reflows when it loads, and always carries real alt text.
+ * A photograph. Pass `src` for a picture somebody uploaded, or `id` for one
+ * from the curated library — library images are cropped server-side to the
+ * ratio they will occupy, so nothing reflows as they load. Either way the
+ * image is object-cover inside its frame and carries real alt text.
  */
-export function Photo({ id, alt, width = 800, ratio = 3 / 2, className = '', eager = false }) {
+export function Photo({ src, id, alt, width = 800, ratio = 3 / 2, className = '', eager = false }) {
   return (
     <img
-      src={photoUrl(id, width, ratio)}
+      src={src || photoUrl(id, width, ratio)}
       alt={alt}
       loading={eager ? 'eager' : 'lazy'}
       decoding="async"

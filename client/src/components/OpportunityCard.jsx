@@ -3,6 +3,7 @@ import { Badge, Icon, Photo, ProgressBar, formatDate } from './ui.jsx';
 import { gigLabel, gigTone } from '../lib/gig.js';
 import { formatDateWithTime } from '../lib/time.js';
 import { opportunityPhoto } from '../lib/imagery.js';
+import { opportunityImageUrl } from '../api/client.js';
 
 /**
  * The opportunity card, used on the landing page, the explore grid and both
@@ -45,8 +46,11 @@ export default function OpportunityCard({ opportunity, footer, featured = false 
           }`}
         >
           <Photo
+            src={opportunity.hasImage ? opportunityImageUrl(_id) : undefined}
             id={opportunityPhoto(opportunity)}
-            alt={`${category} volunteering`}
+            alt={
+              opportunity.hasImage ? `${title}, photographed by ${orgName}` : `${category} volunteering`
+            }
             width={featured ? 700 : 520}
             ratio={featured ? 4 / 5 : 3 / 2}
             className={`transition-transform duration-[900ms] ease-natural group-hover:scale-[1.03] ${

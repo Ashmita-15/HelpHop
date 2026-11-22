@@ -1,6 +1,8 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { api } from '../api/client.js';
 import { Alert, Icon, Spinner } from './ui.jsx';
+import { ACCEPTED_TYPES, prepareCoverImage } from '../lib/image.js';
+import { categoryPhoto, photo as libraryPhoto } from '../lib/imagery.js';
 
 const CATEGORIES = [
   'Environment',
@@ -49,11 +51,19 @@ export const gigToForm = (gig) => ({
 export const toDateInput = (value) => (value ? new Date(value).toISOString().slice(0, 10) : '');
 
 /**
- * Shared create/edit form, including the description generator.
- * `onSubmit` receives the cleaned payload and may throw to surface an error.
+ * Shared create/edit form, including the description generator and the
+ * cover photograph.
+ *
+ * `onSubmit(payload, photo)` receives the cleaned payload plus
+ * `{ dataUrl, remove }` describing what to do with the picture — the caller
+ * owns that second step because a new opportunity has no id until it is
+ * saved. It may throw to surface an error.
+ *
+ * `initialImageUrl` is the existing cover, if the opportunity already has one.
  */
 export default function OpportunityForm({
   initialValues = emptyOpportunity,
+  initialImageUrl = '',
   submitLabel,
   onSubmit,
   onCancel,
@@ -64,7 +74,45 @@ export default function OpportunityForm({
   const [generating, setGenerating] = useState(false);
   const [aiNote, setAiNote] = useState('');
 
+  // Cover photograph. `preview` is whatever should be on screen right now;
+  // `dataUrl` is set only when a new file has been chosen this session.
+  const fileInput = useRef(null);
+  const [preview, setPreview] = useState(initialImageUrl);
+  const [imageDataUrl, setImageDataUrl] = useState('');
+  const [removeImage, setRemoveImage] = useState(false);
+  const [preparing, setPreparing] = useState(false);
+
   const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
+
+  const handleFile = async (e) => {
+    const file = e.target.files?.[0];
+    // Let the same file be chosen again after a removal.
+    e.target.value = '';
+    if (!file) return;
+
+    setError('');
+    setPreparing(true);
+    try {
+      const { dataUrl } = await prepareCoverImage(file);
+      setImageDataUrl(dataUrl);
+      setPreview(dataUrl);
+      setRemoveImage(false);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setPreparing(false);
+    }
+  };
+
+  const clearImage = () => {
+    setImageDataUrl('');
+    setPreview('');
+    // Only ask the API to delete if there was something saved to begin with.
+    setRemoveImage(Boolean(initialImageUrl));
+  };
+
+  // What volunteers will see if no photograph is uploaded.
+  const fallbackPhoto = libraryPhoto(categoryPhoto(form.category, '', form.title), 520, 3 / 2);
 
   const canGenerate = Boolean(form.title.trim() && form.category && form.location.trim());
 
@@ -157,7 +205,7 @@ export default function OpportunityForm({
 
     setSaving(true);
     try {
-      await onSubmit(payload);
+      await onSubmit(payload, { dataUrl: imageDataUrl, remove: removeImage });
     } catch (err) {
       setError(err.message);
       setSaving(false);
@@ -361,9 +409,65 @@ export default function OpportunityForm({
         )}
       </Fieldset>
 
-      {/* -------------------------------------------------------- thank-you */}
+      {/* ----------------------------------------------------- photograph */}
       <Fieldset
         step="03"
+        legend="A photograph"
+        note="Optional, and worth it. A picture of your own people at work says more than a stock photo ever will."
+      >
+        <div className="grid gap-6 sm:grid-cols-[minmax(0,18rem)_1fr] sm:items-start">
+          <div className="photo-frame aspect-[3/2] border border-bark-200">
+            {preparing ? (
+              <div className="flex h-full items-center justify-center">
+                <Spinner className="h-6 w-6 text-sage-600" />
+              </div>
+            ) : (
+              <img
+                src={preview || fallbackPhoto}
+                alt={preview ? 'The photograph you chose' : 'The picture volunteers will see'}
+                className="photo h-full w-full"
+              />
+            )}
+          </div>
+
+          <div>
+            <input
+              ref={fileInput}
+              id="cover"
+              type="file"
+              accept={ACCEPTED_TYPES.join(',')}
+              onChange={handleFile}
+              className="sr-only"
+            />
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                className="btn-outline btn-sm"
+                onClick={() => fileInput.current?.click()}
+                disabled={preparing}
+              >
+                <Icon name="plus" className="h-3.5 w-3.5" />
+                {preview && !removeImage ? 'Choose a different photo' : 'Choose a photo'}
+              </button>
+              {preview && (
+                <button type="button" className="btn-ghost btn-sm" onClick={clearImage}>
+                  Remove
+                </button>
+              )}
+            </div>
+
+            <p className="hint mt-3">
+              {preview
+                ? 'Shown on the card and at the top of the listing. JPEG, PNG or WebP — it is resized in your browser before it is sent, so a photo straight off your phone is fine.'
+                : 'Without one, HelpHop picks a picture that matches the cause and what the title describes — the preview on the left is the one volunteers would see.'}
+            </p>
+          </div>
+        </div>
+      </Fieldset>
+
+      {/* -------------------------------------------------------- thank-you */}
+      <Fieldset
+        step="04"
         legend="What volunteers get"
         note="Everyone marked present receives a certificate. Anything else you offer is recorded here and settled by you directly."
       >

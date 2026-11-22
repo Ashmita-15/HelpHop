@@ -8,6 +8,7 @@ import GigAward from '../models/GigAward.js';
 import Certificate, { generateCertificateCode } from '../models/Certificate.js';
 import { asyncHandler, httpError } from '../middleware/error.js';
 import { mintCheckinToken, verifyCheckinToken } from '../utils/checkin.js';
+import { eventEndsAt, hasEnded } from '../utils/dates.js';
 
 const DAY_MS = 864e5;
 
@@ -191,17 +192,84 @@ export const markAttendance = asyncHandler(async (req, res) => {
   res.json({ volunteerId, present: req.body.present, counts: { present } });
 });
 
+/**
+ * Issues one certificate per attendee, skipping anyone who already has one.
+ *
+ * Deliberately per-volunteer and tolerant: a volunteer whose row fails does
+ * not stop the rest, and the failures are reported back rather than
+ * swallowed, so a retry can pick up exactly what is missing.
+ */
+async function issueCertificates(opportunityId, attendees) {
+  const issued = [];
+  const failed = [];
+
+  for (const attendee of attendees) {
+    const volunteerId = attendee.volunteerId;
+    try {
+      const existing = await Certificate.findOne({ opportunityId, volunteerId });
+      if (existing) continue;
+
+      const cert = await Certificate.create({
+        opportunityId,
+        volunteerId,
+        code: generateCertificateCode(),
+      });
+      issued.push(cert._id);
+    } catch (err) {
+      // 11000 on the { opportunityId, volunteerId } index means a concurrent
+      // completion beat us to this attendee — that is success, not failure.
+      if (err.code === 11000) continue;
+      console.error(
+        `[certificates] could not issue for volunteer ${volunteerId} on opportunity ${opportunityId}:`,
+        err.message
+      );
+      failed.push(String(volunteerId));
+    }
+  }
+
+  return { issued, failed };
+}
+
 // POST /api/opportunities/:id/complete   (owning organization)
 export const completeOpportunity = asyncHandler(async (req, res) => {
   const doc = await findOwned(req.params.id, req.user);
 
-  const startOfDay = new Date(doc.date);
-  startOfDay.setHours(0, 0, 0, 0);
-  if (Date.now() < startOfDay.getTime()) {
-    throw httpError(409, "You can't complete an event before the day it happens");
+  // An event can only be closed once it has actually finished. This compares
+  // real instants — the scheduled end resolved against the event's own UTC
+  // offset — rather than calendar dates, so an event that ran 09:00–13:00
+  // today can be completed this afternoon, and one running until 23:59
+  // tonight cannot.
+  const endsAt = eventEndsAt(doc);
+  if (!doc.completedAt && !hasEnded(doc)) {
+    throw httpError(
+      409,
+      `This event hasn't finished yet — you can complete it after ${endsAt.toISOString()}`
+    );
   }
 
-  const attendees = await Attendance.find({ opportunityId: doc._id }).select('volunteerId');
+  const [attendees, registeredCount] = await Promise.all([
+    Attendance.find({ opportunityId: doc._id }).select('volunteerId'),
+    Registration.countDocuments({ opportunityId: doc._id }),
+  ]);
+
+  // Completing locks attendance, so closing an event before anyone has been
+  // marked present leaves volunteers with nothing. Refuse unless the
+  // organisation says explicitly that nobody came. Skipped on an already
+  // completed event, where this call is a retry rather than a first close.
+  if (
+    !doc.completedAt &&
+    attendees.length === 0 &&
+    registeredCount > 0 &&
+    !req.body?.confirmNoAttendees
+  ) {
+    throw httpError(
+      409,
+      `Nobody has been marked present yet, so no certificates would be issued. ` +
+        `Take attendance first, or confirm that none of the ${registeredCount} ` +
+        `volunteer${registeredCount === 1 ? '' : 's'} turned up.`
+    );
+  }
+
   const issuesGig = doc.gig?.mode === 'paid' || doc.gig?.mode === 'perk';
 
   // Upserts keep this idempotent: re-running changes nothing and the unique
@@ -228,20 +296,7 @@ export const completeOpportunity = asyncHandler(async (req, res) => {
     );
   }
 
-  for (const a of attendees) {
-    const existing = await Certificate.findOne({ opportunityId: doc._id, volunteerId: a.volunteerId });
-    if (existing) continue;
-    try {
-      await Certificate.create({
-        opportunityId: doc._id,
-        volunteerId: a.volunteerId,
-        code: generateCertificateCode(),
-      });
-    } catch (err) {
-      // 11000 here means a concurrent complete() beat us to this attendee.
-      if (err.code !== 11000) throw err;
-    }
-  }
+  const { issued, failed } = await issueCertificates(doc._id, attendees);
 
   if (!doc.completedAt) {
     doc.completedAt = new Date();
@@ -254,10 +309,37 @@ export const completeOpportunity = asyncHandler(async (req, res) => {
   ]);
 
   res.json({
-    message: `"${doc.title}" completed`,
+    message: failed.length
+      ? `"${doc.title}" completed, but ${failed.length} certificate${failed.length === 1 ? '' : 's'} could not be issued. Run it again to retry just those.`
+      : `"${doc.title}" completed`,
     completedAt: doc.completedAt,
     attendees: attendees.length,
     awards,
+    certificates,
+    newlyIssued: issued.length,
+    failedCertificates: failed.length,
+  });
+});
+
+/**
+ * POST /api/opportunities/:id/reopen   (owning organization)
+ *
+ * Unlocks attendance on an event that was completed too early — the usual
+ * case being an organisation that closed it before marking anyone present.
+ * Certificates already issued are left alone; completing again tops up only
+ * the ones that are missing.
+ */
+export const reopenOpportunity = asyncHandler(async (req, res) => {
+  const doc = await findOwned(req.params.id, req.user);
+  if (!doc.completedAt) throw httpError(409, 'This event is not completed');
+
+  doc.completedAt = null;
+  await doc.save();
+
+  const certificates = await Certificate.countDocuments({ opportunityId: doc._id });
+  res.json({
+    message: `"${doc.title}" reopened — you can take attendance again`,
+    completedAt: null,
     certificates,
   });
 });

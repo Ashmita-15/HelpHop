@@ -7,8 +7,23 @@ import { PageHeader } from '../components/ui.jsx';
 export default function CreateOpportunity() {
   const navigate = useNavigate();
 
-  const handleSubmit = async (payload) => {
-    await api.createOpportunity(payload);
+  // The photograph can only be attached once the opportunity has an id, so it
+  // is a second request. If it fails the listing still exists — say so rather
+  // than pretending nothing happened.
+  const handleSubmit = async (payload, photo) => {
+    const { opportunity } = await api.createOpportunity(payload);
+
+    if (photo?.dataUrl) {
+      try {
+        await api.putOpportunityImage(opportunity._id, photo.dataUrl);
+      } catch (err) {
+        throw new Error(
+          `Your opportunity was published, but the photograph didn’t save: ${err.message} ` +
+            'You can add it again by editing the listing.'
+        );
+      }
+    }
+
     navigate('/dashboard', { replace: true });
   };
 

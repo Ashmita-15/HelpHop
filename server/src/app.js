@@ -22,7 +22,18 @@ export function createApp() {
     .filter(Boolean);
 
   app.use(cors({ origin: origins }));
-  app.use(express.json({ limit: '100kb' }));
+
+  // An opportunity's cover photograph arrives as a data URL, which is far
+  // wider than any other request this API takes. body-parser only ever parses
+  // a body once, so the generous parser has to be reached first — behind the
+  // general 100kb one the image would be rejected before it was looked at.
+  const COVER_IMAGE_PATH = /^\/api\/opportunities\/[^/]+\/image\/?$/;
+  const imageJson = express.json({ limit: '2mb' });
+  const generalJson = express.json({ limit: '100kb' });
+
+  app.use((req, res, next) =>
+    COVER_IMAGE_PATH.test(req.path) ? imageJson(req, res, next) : generalJson(req, res, next)
+  );
 
   // Health check does not require MongoDB.
   app.get('/api/health', (_req, res) => {

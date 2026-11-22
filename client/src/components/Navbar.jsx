@@ -10,7 +10,7 @@ import { Avatar, Icon } from './ui.jsx';
  * scrolls, at which point a single hairline appears — that's the whole effect.
  */
 export default function Navbar() {
-  const { user, logout, isOrganization } = useAuth();
+  const { user, logout, isOrganization, isVolunteer } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [open, setOpen] = useState(false);
@@ -44,6 +44,7 @@ export default function Navbar() {
     { to: '/opportunities', label: 'Opportunities' },
     { to: '/about', label: 'About' },
     ...(user ? [{ to: '/dashboard', label: isOrganization ? 'Your desk' : 'Your shelf' }] : []),
+    ...(isVolunteer ? [{ to: '/checkin', label: 'Check in' }] : []),
     ...(isOrganization ? [{ to: '/opportunities/new', label: 'Post an opportunity' }] : []),
   ];
 

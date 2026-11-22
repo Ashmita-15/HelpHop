@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 
-import { api } from '../api/client.js';
+import { api, opportunityImageUrl } from '../api/client.js';
 import OpportunityForm, { gigToForm, toDateInput } from '../components/OpportunityForm.jsx';
 import { Alert, Icon, Loading, PageHeader } from '../components/ui.jsx';
 
@@ -10,13 +10,15 @@ export default function EditOpportunity() {
   const navigate = useNavigate();
 
   const [initialValues, setInitialValues] = useState(null);
+  const [initialImageUrl, setInitialImageUrl] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     api
       .getOpportunity(id)
-      .then(({ opportunity: o }) =>
+      .then(({ opportunity: o }) => {
+        setInitialImageUrl(o.hasImage ? opportunityImageUrl(o._id) : '');
         setInitialValues({
           title: o.title,
           description: o.description,
@@ -28,14 +30,19 @@ export default function EditOpportunity() {
           endTime: o.endTime || '',
           requiredVolunteers: o.requiredVolunteers,
           ...gigToForm(o.gig),
-        })
-      )
+        });
+      })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
   }, [id]);
 
-  const handleSubmit = async (payload) => {
+  const handleSubmit = async (payload, photo) => {
     await api.updateOpportunity(id, payload);
+
+    // The photograph lives behind its own endpoint, so it is saved separately.
+    if (photo?.dataUrl) await api.putOpportunityImage(id, photo.dataUrl);
+    else if (photo?.remove) await api.deleteOpportunityImage(id);
+
     navigate('/dashboard', { replace: true });
   };
 
@@ -64,6 +71,7 @@ export default function EditOpportunity() {
       <div className="mt-12">
         <OpportunityForm
           initialValues={initialValues}
+          initialImageUrl={initialImageUrl}
           submitLabel="Save changes"
           onSubmit={handleSubmit}
           onCancel={() => navigate('/dashboard')}

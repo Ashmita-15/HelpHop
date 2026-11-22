@@ -26,10 +26,21 @@ const opportunitySchema = new mongoose.Schema(
     location: { type: String, required: true, trim: true, maxlength: 120 },
     // The specific meeting point within that area. Optional.
     venue: { type: String, trim: true, maxlength: 200 },
+    // The calendar day the event falls on. Display and filtering only — the
+    // authoritative moments are startsAt / endsAt below.
     date: { type: Date, required: true },
-    // 'HH:mm', 24-hour. Display only — see utils/dates.js for the past rule.
+    // 'HH:mm', 24-hour, in the event's own local time.
     startTime: { type: String, trim: true },
     endTime: { type: String, trim: true },
+    // Minutes east of UTC where the event happens, captured from the
+    // organiser's browser when they wrote it (Kolkata +330, Chicago -360).
+    tzOffsetMinutes: { type: Number, default: null },
+    // date + startTime/endTime resolved against tzOffsetMinutes into real
+    // instants, so "has this finished?" is one timestamp comparison and never
+    // a string or calendar-date guess. Written by the controller on every
+    // create and update; see utils/dates.js.
+    startsAt: { type: Date, index: true },
+    endsAt: { type: Date, index: true },
     requiredVolunteers: { type: Number, required: true, min: 1, max: 10000 },
     organizationId: {
       type: mongoose.Schema.Types.ObjectId,
@@ -46,6 +57,9 @@ const opportunitySchema = new mongoose.Schema(
       perkTitle: { type: String, trim: true, maxlength: 120 },
       perkDescription: { type: String, trim: true, maxlength: 1000 },
     },
+    // True once a cover photograph has been uploaded. The bytes live in the
+    // OpportunityImage collection — see that model for why.
+    hasImage: { type: Boolean, default: false },
     // Set once, when the organizer closes the event and issues awards.
     completedAt: { type: Date },
     checkinSecret: {

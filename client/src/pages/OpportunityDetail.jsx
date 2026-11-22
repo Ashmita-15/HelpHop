@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 
-import { api } from '../api/client.js';
+import { api, opportunityImageUrl } from '../api/client.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { Sprig } from '../components/Ornament.jsx';
 import {
@@ -17,6 +17,7 @@ import {
 } from '../components/ui.jsx';
 import { gigLabel } from '../lib/gig.js';
 import { formatTimeRange } from '../lib/time.js';
+import { checkinOpen, isToday as isSameDay } from '../lib/checkin.js';
 import { opportunityPhoto } from '../lib/imagery.js';
 
 export default function OpportunityDetail() {
@@ -100,12 +101,10 @@ export default function OpportunityDetail() {
 
   const reward = gigLabel(gig);
   const timeRange = formatTimeRange(startTime, endTime);
-  const eventDay = new Date(date);
-  const now = new Date();
-  const isToday =
-    eventDay.getFullYear() === now.getFullYear() &&
-    eventDay.getMonth() === now.getMonth() &&
-    eventDay.getDate() === now.getDate();
+  const isToday = isSameDay(date);
+  // Check-in stays open for two days after the event, so it is offered on
+  // exactly the days the server would accept it.
+  const canCheckIn = checkinOpen(opportunity);
   const startOfToday = new Date();
   startOfToday.setHours(0, 0, 0, 0);
   const finished = !!completedAt || new Date(date) < startOfToday;
@@ -163,8 +162,11 @@ export default function OpportunityDetail() {
 
         <div className="photo-frame aspect-[3/2]">
           <Photo
+            src={opportunity.hasImage ? opportunityImageUrl(id) : undefined}
             id={opportunityPhoto({ ...opportunity, _id: id })}
-            alt={`${category} volunteering`}
+            alt={
+              opportunity.hasImage ? `${title}, photographed by ${orgName}` : `${category} volunteering`
+            }
             width={760}
             ratio={3 / 2}
             eager
@@ -300,10 +302,12 @@ export default function OpportunityDetail() {
                 </div>
               )}
 
-              {isVolunteer && !finished && joined && isToday && !attended && (
+              {isVolunteer && joined && canCheckIn && !attended && (
                 <div className="mb-4 rounded-field border border-sage-200 bg-sage-50 p-4">
                   <p className="text-sm leading-relaxed text-sage-800">
-                    This is happening today — mark yourself present when you arrive.
+                    {isToday
+                      ? 'This is happening today — mark yourself present when you arrive.'
+                      : 'You haven’t been marked present yet. Check-in is still open.'}
                   </p>
                   <Link to={`/checkin/${opportunity._id}`} className="btn-primary btn-sm mt-3 w-full">
                     <Icon name="qr" className="h-3.5 w-3.5" />

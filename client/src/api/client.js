@@ -56,6 +56,9 @@ const qs = (params) => {
   return search ? `?${search}` : '';
 };
 
+/** Public URL of an opportunity's uploaded cover photograph. */
+export const opportunityImageUrl = (id) => `${BASE_URL}/opportunities/${id}/image`;
+
 export const api = {
   // Auth
   register: (payload) => request('/auth/register', { method: 'POST', body: payload, auth: false }),
@@ -70,6 +73,11 @@ export const api = {
     request(`/opportunities/${id}`, { method: 'PUT', body: payload }),
   deleteOpportunity: (id) => request(`/opportunities/${id}`, { method: 'DELETE' }),
   joinOpportunity: (id) => request(`/opportunities/${id}/join`, { method: 'POST' }),
+
+  // Cover photograph. `image` is a data URL produced by lib/image.js.
+  putOpportunityImage: (id, image) =>
+    request(`/opportunities/${id}/image`, { method: 'PUT', body: { image } }),
+  deleteOpportunityImage: (id) => request(`/opportunities/${id}/image`, { method: 'DELETE' }),
   listVolunteers: (id) => request(`/opportunities/${id}/volunteers`),
   categories: () => request('/opportunities/categories', { auth: false }),
 

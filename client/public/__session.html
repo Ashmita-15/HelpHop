@@ -1,0 +1,9 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>session</title>
+<p>setting session…</p>
+<script>
+  const t = new URLSearchParams(location.search).get('t');
+  if (t) localStorage.setItem('vc_token', t); else localStorage.removeItem('vc_token');
+  document.body.textContent = 'ok';
+</script>

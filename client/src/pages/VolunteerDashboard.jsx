@@ -8,6 +8,7 @@ import VolunteerRewards from '../components/VolunteerRewards.jsx';
 import PreviousEvents from '../components/PreviousEvents.jsx';
 import CheckinBanner from '../components/CheckinBanner.jsx';
 import { Sprig } from '../components/Ornament.jsx';
+import { openForCheckin } from '../lib/checkin.js';
 import {
   Alert,
   CardSkeleton,
@@ -64,6 +65,10 @@ export default function VolunteerDashboard() {
   const firstName = user.name.split(' ')[0];
   const next = opportunities[0];
 
+  // An event stays checkinable for two days, by which time it has moved into
+  // `previous` — so both lists feed the banner.
+  const checkinable = openForCheckin([...opportunities, ...previous]);
+
   return (
     <div className="shell py-12 sm:py-16">
       {/* --------------------------------------------------------- greeting */}
@@ -82,13 +87,21 @@ export default function VolunteerDashboard() {
               : 'Nothing in the diary at the moment — the board is open whenever you are.'}
           </p>
         </div>
-        <Link to="/opportunities" className="btn-outline">
-          <Icon name="search" className="h-4 w-4" />
-          Find something new
-        </Link>
+        <div className="flex flex-wrap gap-2">
+          {checkinable.length > 0 && (
+            <Link to="/checkin" className="btn-primary">
+              <Icon name="qr" className="h-4 w-4" />
+              Check in
+            </Link>
+          )}
+          <Link to="/opportunities" className="btn-outline">
+            <Icon name="search" className="h-4 w-4" />
+            Find something new
+          </Link>
+        </div>
       </header>
 
-      <CheckinBanner events={opportunities} />
+      <CheckinBanner events={checkinable} />
 
       <div className="mt-10 grid gap-8 sm:grid-cols-3">
         <StatCard label="Opportunities claimed" value={stats.totalJoined} hint="Since you joined" />

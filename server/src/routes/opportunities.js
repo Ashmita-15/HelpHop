@@ -15,8 +15,15 @@ import {
   listAttendance,
   markAttendance,
   completeOpportunity,
+  reopenOpportunity,
 } from '../controllers/attendanceController.js';
+import {
+  putOpportunityImage,
+  deleteOpportunityImage,
+  getOpportunityImage,
+} from '../controllers/opportunityImageController.js';
 import { listOpportunityGigs } from '../controllers/gigController.js';
+import { listOpportunityCertificates } from '../controllers/certificateController.js';
 import { requireAuth, requireRole, optionalAuth } from '../middleware/auth.js';
 
 const router = Router();
@@ -25,12 +32,18 @@ const router = Router();
 router.get('/categories', listCategories);
 router.get('/', optionalAuth, listOpportunities);
 router.get('/:id', optionalAuth, getOpportunity);
+router.get('/:id/image', getOpportunityImage);
 
 // Organization-only management
 router.post('/', requireAuth, requireRole('organization'), createOpportunity);
 router.put('/:id', requireAuth, requireRole('organization'), updateOpportunity);
 router.delete('/:id', requireAuth, requireRole('organization'), deleteOpportunity);
 router.get('/:id/volunteers', requireAuth, requireRole('organization'), listVolunteers);
+
+// Cover photograph. Its wider body limit is applied in app.js, which has to
+// reach the request before the general JSON parser does.
+router.put('/:id/image', requireAuth, requireRole('organization'), putOpportunityImage);
+router.delete('/:id/image', requireAuth, requireRole('organization'), deleteOpportunityImage);
 
 // Volunteer-only sign-up
 router.post('/:id/join', requireAuth, requireRole('volunteer'), joinOpportunity);
@@ -46,8 +59,16 @@ router.patch(
   markAttendance
 );
 
-// Completion issues the gigs and certificates
+// Completion issues the gigs and certificates; reopening unlocks attendance
+// on an event that was closed too soon.
 router.post('/:id/complete', requireAuth, requireRole('organization'), completeOpportunity);
+router.post('/:id/reopen', requireAuth, requireRole('organization'), reopenOpportunity);
 router.get('/:id/gigs', requireAuth, requireRole('organization'), listOpportunityGigs);
+router.get(
+  '/:id/certificates',
+  requireAuth,
+  requireRole('organization'),
+  listOpportunityCertificates
+);
 
 export default router;

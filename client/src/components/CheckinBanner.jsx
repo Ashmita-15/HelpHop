@@ -1,26 +1,18 @@
 import { Link } from 'react-router-dom';
 
-import { Icon } from './ui.jsx';
+import { Icon, formatDate } from './ui.jsx';
 import { Sprig } from './Ornament.jsx';
 import { formatTimeRange } from '../lib/time.js';
-
-const isToday = (value) => {
-  const d = new Date(value);
-  const now = new Date();
-  return (
-    d.getFullYear() === now.getFullYear() &&
-    d.getMonth() === now.getMonth() &&
-    d.getDate() === now.getDate()
-  );
-};
+import { isToday, openForCheckin } from '../lib/checkin.js';
 
 /**
- * Check-in is only findable if it is put in front of the volunteer on the
- * day. Shows today's claimed events with a direct way in; renders nothing
- * on every other day.
+ * Check-in is only findable if it is put in front of the volunteer while it
+ * is open. Shows every claimed event inside the check-in window with a direct
+ * way in, and renders nothing the rest of the time — the standing "Check in"
+ * link in the menu covers those days.
  */
 export default function CheckinBanner({ events = [] }) {
-  const today = events.filter((o) => isToday(o.date) && !o.completedAt && !o.attended);
+  const today = openForCheckin(events);
   if (today.length === 0) return null;
 
   return (
@@ -29,7 +21,11 @@ export default function CheckinBanner({ events = [] }) {
         <Sprig className="mt-0.5 hidden h-6 w-6 shrink-0 text-sage-500 sm:block" />
         <div className="min-w-0 flex-1">
           <h2 className="font-serif text-xl text-sage-900">
-            {today.length === 1 ? 'Today’s the day' : `${today.length} things on today`}
+            {today.length === 1
+              ? isToday(today[0].date)
+                ? 'Today’s the day'
+                : 'You still need to check in'
+              : `${today.length} events are waiting for your check-in`}
           </h2>
           <p className="mt-1.5 text-sm leading-relaxed text-sage-800">
             Scan the organiser&apos;s QR code, or type the six-digit number they read out, to mark
@@ -47,7 +43,7 @@ export default function CheckinBanner({ events = [] }) {
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm text-bark-800">{o.title}</p>
                     <p className="truncate text-xs text-bark-500">
-                      {o.venue || o.location}
+                      {o.venue || o.location} · {isToday(o.date) ? 'Today' : formatDate(o.date)}
                       {range ? ` · ${range}` : ''}
                     </p>
                   </div>
