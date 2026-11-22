@@ -59,13 +59,34 @@ function mockDescription({ title, category, location }) {
   );
 }
 
-async function geminiDescription({ title, category, location }) {
-  const model = process.env.GEMINI_MODEL || 'gemini-2.0-flash';
+/** Human-readable reason for a failed call, for the note shown in the form. */
+class AiError extends Error {
+  constructor(message, note) {
+    super(message);
+    this.note = note;
+  }
+}
+
+async function geminiDescription({ title, category, location, venue, startTime, endTime }) {
+  // 2.5-flash is what the old 'gemini-2.0-flash' alias already resolves to.
+  const model = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
+
+  // Only send the optional fields that are actually set, so the model never
+  // writes around an empty "Venue:" line.
+  const facts = [
+    `Title: ${title}`,
+    `Category: ${category}`,
+    `Location: ${location}`,
+    venue ? `Venue: ${venue}` : null,
+    startTime ? `Time: ${startTime}${endTime ? ` to ${endTime}` : ''}` : null,
+  ]
+    .filter(Boolean)
+    .join('\n');
 
   const prompt =
     `Write a concise, engaging description for a volunteer opportunity.\n\n` +
-    `Title: ${title}\nCategory: ${category}\nLocation: ${location}\n\n` +
+    `${facts}\n\n` +
     `Requirements:\n` +
     `- 3 to 5 sentences, 60-110 words, single paragraph.\n` +
     `- Warm and welcoming; explain the impact volunteers will have and what they will do.\n` +
@@ -85,23 +106,52 @@ async function geminiDescription({ title, category, location }) {
       },
       body: JSON.stringify({
         contents: [{ role: 'user', parts: [{ text: prompt }] }],
-        generationConfig: { temperature: 0.8, maxOutputTokens: 400 },
+        generationConfig: {
+          temperature: 0.8,
+          maxOutputTokens: 800,
+          // Gemini 2.5 bills internal reasoning against maxOutputTokens. Left
+          // on, thinking eats the whole budget and the description comes back
+          // truncated or empty. We don't need reasoning for a short blurb.
+          thinkingConfig: { thinkingBudget: 0 },
+        },
       }),
       signal: controller.signal,
     });
 
     if (!res.ok) {
       const body = await res.text();
-      throw new Error(`Gemini responded ${res.status}: ${body.slice(0, 200)}`);
+      // The body can echo request details, so keep it out of the user's note.
+      const note =
+        res.status === 429
+          ? 'The AI service is rate-limited right now — generated with the built-in template.'
+          : res.status === 400 || res.status === 403
+            ? 'The AI key was rejected — check GEMINI_API_KEY. Generated with the built-in template.'
+            : 'The AI service was unavailable — generated with the built-in template.';
+      throw new AiError(`Gemini responded ${res.status}: ${body.slice(0, 200)}`, note);
     }
 
     const data = await res.json();
-    const text = data?.candidates?.[0]?.content?.parts
+    const candidate = data?.candidates?.[0];
+    const text = candidate?.content?.parts
       ?.map((p) => p.text || '')
       .join('')
       .trim();
 
-    if (!text) throw new Error('Gemini returned an empty response');
+    // A description cut off mid-sentence is worse than the template, so treat
+    // truncation as a failure even when some text came back.
+    if (candidate?.finishReason === 'MAX_TOKENS') {
+      throw new AiError(
+        `Gemini hit the output cap (thinking tokens: ${data?.usageMetadata?.thoughtsTokenCount ?? 0})`,
+        'The AI reply was cut short — generated with the built-in template.'
+      );
+    }
+    if (!text) {
+      throw new AiError(
+        `Gemini returned no text (finishReason: ${candidate?.finishReason || 'unknown'})`,
+        'The AI returned nothing usable — generated with the built-in template.'
+      );
+    }
+
     return text.replace(/\s+/g, ' ').trim();
   } finally {
     clearTimeout(timeout);
@@ -111,24 +161,46 @@ async function geminiDescription({ title, category, location }) {
 /**
  * @returns {Promise<{description: string, source: 'gemini'|'mock', note?: string}>}
  */
-export async function generateDescription({ title, category, location }) {
+export async function generateDescription({
+  title,
+  category,
+  location,
+  venue,
+  startTime,
+  endTime,
+}) {
+  // The template only ever needs these three; venue and time are a bonus for
+  // the model, never a requirement.
+  const fallback = () => mockDescription({ title, category, location });
+
   if (!process.env.GEMINI_API_KEY) {
     return {
-      description: mockDescription({ title, category, location }),
+      description: fallback(),
       source: 'mock',
       note: 'GEMINI_API_KEY is not set — generated with the built-in template.',
     };
   }
 
   try {
-    const description = await geminiDescription({ title, category, location });
+    const description = await geminiDescription({
+      title,
+      category,
+      location,
+      venue,
+      startTime,
+      endTime,
+    });
     return { description, source: 'gemini' };
   } catch (err) {
+    const timedOut = err.name === 'AbortError';
+    // err.message can carry API detail; the note is what the organizer sees.
     console.warn('[ai] Gemini call failed, falling back to template:', err.message);
     return {
-      description: mockDescription({ title, category, location }),
+      description: fallback(),
       source: 'mock',
-      note: 'The AI service was unavailable — generated with the built-in template.',
+      note: timedOut
+        ? 'The AI service took too long to answer — generated with the built-in template.'
+        : err.note || 'The AI service was unavailable — generated with the built-in template.',
     };
   }
 }

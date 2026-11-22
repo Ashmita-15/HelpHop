@@ -22,7 +22,10 @@ export default function EditOpportunity() {
           description: o.description,
           category: o.category,
           location: o.location,
+          venue: o.venue || '',
           date: toDateInput(o.date),
+          startTime: o.startTime || '',
+          endTime: o.endTime || '',
           requiredVolunteers: o.requiredVolunteers,
           ...gigToForm(o.gig),
         })

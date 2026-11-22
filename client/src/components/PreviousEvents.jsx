@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { api } from '../api/client.js';
 import { gigLabel } from '../lib/gig.js';
 import { certificateFilename, saveBlob } from '../lib/download.js';
+import { formatDateWithTime } from '../lib/time.js';
 import { Alert, Badge, Icon, Spinner, formatDate } from './ui.jsx';
 
 const COLLAPSE_AFTER = 6;
@@ -67,7 +68,8 @@ export default function PreviousEvents({ events }) {
                   {event.title}
                 </Link>
                 <p className="mt-0.5 truncate text-xs text-ink-500">
-                  {event.organizationId?.name || 'An organization'} · {formatDate(event.date)}
+                  {event.organizationId?.name || 'An organization'} ·{' '}
+                  {formatDateWithTime(formatDate(event.date), event.startTime, event.endTime)}
                 </p>
               </div>
 

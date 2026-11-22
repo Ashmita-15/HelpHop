@@ -22,8 +22,14 @@ const opportunitySchema = new mongoose.Schema(
     title: { type: String, required: true, trim: true, maxlength: 120 },
     description: { type: String, required: true, trim: true, maxlength: 4000 },
     category: { type: String, required: true, enum: CATEGORIES },
+    // Broad area — this is what Browse filters on.
     location: { type: String, required: true, trim: true, maxlength: 120 },
+    // The specific meeting point within that area. Optional.
+    venue: { type: String, trim: true, maxlength: 200 },
     date: { type: Date, required: true },
+    // 'HH:mm', 24-hour. Display only — see utils/dates.js for the past rule.
+    startTime: { type: String, trim: true },
+    endTime: { type: String, trim: true },
     requiredVolunteers: { type: Number, required: true, min: 1, max: 10000 },
     organizationId: {
       type: mongoose.Schema.Types.ObjectId,

@@ -6,6 +6,7 @@ import { useAuth } from '../context/AuthContext.jsx';
 import OpportunityCard from '../components/OpportunityCard.jsx';
 import VolunteerRewards from '../components/VolunteerRewards.jsx';
 import PreviousEvents from '../components/PreviousEvents.jsx';
+import CheckinBanner from '../components/CheckinBanner.jsx';
 import {
   Alert,
   CardSkeleton,
@@ -74,7 +75,9 @@ export default function VolunteerDashboard() {
         }
       />
 
-      <div className="grid gap-4 sm:grid-cols-3">
+      <CheckinBanner events={opportunities} />
+
+      <div className="mt-6 grid gap-4 sm:grid-cols-3">
         <StatCard
           label="Opportunities joined"
           value={stats.totalJoined}

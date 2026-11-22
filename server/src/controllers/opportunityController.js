@@ -125,6 +125,30 @@ function readGig(raw) {
   return { mode: 'none' };
 }
 
+/** 'HH:mm', 24-hour. Returns '' when not supplied. */
+const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+function readTime(raw, label) {
+  const value = (raw || '').trim();
+  if (!value) return '';
+  if (!TIME_RE.test(value)) throw httpError(400, `${label} must be a time like 09:00`);
+  return value;
+}
+
+/** Times are display context only — they never affect whether an event is past. */
+function readWhenAndWhere(body) {
+  const venue = (body.venue || '').trim().slice(0, 200);
+  const startTime = readTime(body.startTime, 'Start time');
+  const endTime = readTime(body.endTime, 'End time');
+
+  if (endTime && !startTime) throw httpError(400, 'Add a start time before an end time');
+  if (startTime && endTime && endTime <= startTime) {
+    throw httpError(400, 'End time must be after the start time');
+  }
+
+  return { venue, startTime, endTime };
+}
+
 function readOpportunityBody(body) {
   const title = (body.title || '').trim();
   const description = (body.description || '').trim();
@@ -144,7 +168,16 @@ function readOpportunityBody(body) {
     throw httpError(400, 'Required volunteers must be a whole number of at least 1');
   }
 
-  return { title, description, category, location, date, requiredVolunteers, gig: readGig(body.gig) };
+  return {
+    title,
+    description,
+    category,
+    location,
+    date,
+    requiredVolunteers,
+    gig: readGig(body.gig),
+    ...readWhenAndWhere(body),
+  };
 }
 
 // POST /api/opportunities  (organization only)

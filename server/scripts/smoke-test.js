@@ -318,6 +318,9 @@ try {
   const foreignTok = await call(`/opportunities/${evtId}/checkin-token`, { method: 'POST', token: org2.body.token });
   check('another org cannot mint a token → 403', foreignTok.status === 403, `got ${foreignTok.status}`);
 
+  check('token response includes a 6-digit typed code', /^\d{6}$/.test(tok.body?.code || ''),
+    `got ${tok.body?.code}`);
+
   const scan = await call(`/opportunities/${evtId}/checkin`, {
     method: 'POST', token: volToken, body: { token: tok.body.token },
   });
@@ -355,6 +358,56 @@ try {
     method: 'POST', token: vol3.body.token, body: { token: tok.body.token },
   });
   check('unregistered volunteer cannot check in → 403', unregistered.status === 403, `got ${unregistered.status}`);
+
+  // The typed code is the no-camera path: it must behave exactly like the QR.
+  const codeEvt = await call('/opportunities', {
+    method: 'POST', token: orgToken,
+    body: {
+      title: 'Typed code drill', description: 'x'.repeat(60), category: 'Community',
+      location: 'Kolkata', date: today.toISOString(), requiredVolunteers: 4, gig: { mode: 'none' },
+    },
+  });
+  const codeEvtId = codeEvt.body.opportunity._id;
+  await call(`/opportunities/${codeEvtId}/join`, { method: 'POST', token: volToken });
+  const codeTok = await call(`/opportunities/${codeEvtId}/checkin-token`, { method: 'POST', token: orgToken });
+
+  const byCode = await call(`/opportunities/${codeEvtId}/checkin`, {
+    method: 'POST', token: volToken, body: { token: codeTok.body.code },
+  });
+  check('checking in with the typed code → 201', byCode.status === 201, `got ${byCode.status}`);
+  check('a typed-code check-in still counts as qr', byCode.body?.attendance?.method === 'qr');
+
+  const wrongCode = await call(`/opportunities/${codeEvtId}/checkin`, {
+    method: 'POST', token: vol2.body.token, body: { token: '000000' },
+  });
+  check('a wrong 6-digit code → 401 (not accepted)', [401, 403].includes(wrongCode.status), `got ${wrongCode.status}`);
+
+  const shortCode = await call(`/opportunities/${codeEvtId}/checkin`, {
+    method: 'POST', token: vol2.body.token, body: { token: '12345' },
+  });
+  check('a 5-digit code → 401', [401, 403].includes(shortCode.status), `got ${shortCode.status}`);
+
+  // Another event's code must not work here.
+  const crossCode = await call(`/opportunities/${codeEvtId}/checkin`, {
+    method: 'POST', token: vol2.body.token, body: { token: tok.body.code },
+  });
+  check("another event's typed code is rejected", [401, 403].includes(crossCode.status), `got ${crossCode.status}`);
+
+  // Brute-force guard: the code is only 6 digits, so repeated failures lock out.
+  const guinea = await call('/auth/register', {
+    method: 'POST',
+    body: { name: 'Brute Force', email: 'brute@test.dev', password: 'password123', role: 'volunteer' },
+  });
+  await call(`/opportunities/${codeEvtId}/join`, { method: 'POST', token: guinea.body.token });
+  let lockedStatus = 0;
+  for (let i = 0; i < 12; i++) {
+    const r = await call(`/opportunities/${codeEvtId}/checkin`, {
+      method: 'POST', token: guinea.body.token, body: { token: '999999' },
+    });
+    lockedStatus = r.status;
+    if (r.status === 429) break;
+  }
+  check('repeated wrong codes get throttled → 429', lockedStatus === 429, `got ${lockedStatus}`);
 
   const futureEvt = await call('/opportunities', {
     method: 'POST', token: orgToken,
@@ -522,6 +575,89 @@ try {
 
   const anonPdf = await fetch(`${BASE}/certificates/${cert.id}/download`);
   check('anonymous download → 401', anonPdf.status === 401, `got ${anonPdf.status}`);
+
+  console.log('\n▶ Time and venue');
+  const mkWhen = (overrides) => ({
+    title: 'Timed shift', description: 'x'.repeat(60), category: 'Community',
+    location: 'Kolkata', date: new Date().toISOString(), requiredVolunteers: 3,
+    gig: { mode: 'none' }, ...overrides,
+  });
+
+  const timed = await call('/opportunities', {
+    method: 'POST', token: orgToken,
+    body: mkWhen({ venue: 'Gate 3, Riverside Park', startTime: '09:00', endTime: '13:00' }),
+  });
+  check('create with venue + times → 201', timed.status === 201, `got ${timed.status}`);
+  check('venue persists', timed.body?.opportunity?.venue === 'Gate 3, Riverside Park');
+  check('startTime persists', timed.body?.opportunity?.startTime === '09:00');
+  check('endTime persists', timed.body?.opportunity?.endTime === '13:00');
+  const timedId = timed.body.opportunity._id;
+
+  const bare = await call('/opportunities', { method: 'POST', token: orgToken, body: mkWhen({}) });
+  check('create with none of them still works → 201 (back-compat)', bare.status === 201, `got ${bare.status}`);
+  check('absent venue is not invented', !bare.body.opportunity.venue);
+  check('absent times are not invented', !bare.body.opportunity.startTime && !bare.body.opportunity.endTime);
+
+  const badTime = await call('/opportunities', {
+    method: 'POST', token: orgToken, body: mkWhen({ startTime: '9am' }),
+  });
+  check('malformed time → 400', badTime.status === 400, `got ${badTime.status}`);
+
+  const outOfRange = await call('/opportunities', {
+    method: 'POST', token: orgToken, body: mkWhen({ startTime: '25:00' }),
+  });
+  check('out-of-range hour → 400', outOfRange.status === 400, `got ${outOfRange.status}`);
+
+  const backwards = await call('/opportunities', {
+    method: 'POST', token: orgToken, body: mkWhen({ startTime: '14:00', endTime: '09:00' }),
+  });
+  check('end before start → 400', backwards.status === 400, `got ${backwards.status}`);
+
+  const equalTimes = await call('/opportunities', {
+    method: 'POST', token: orgToken, body: mkWhen({ startTime: '09:00', endTime: '09:00' }),
+  });
+  check('end equal to start → 400', equalTimes.status === 400, `got ${equalTimes.status}`);
+
+  const endOnly = await call('/opportunities', {
+    method: 'POST', token: orgToken, body: mkWhen({ endTime: '17:00' }),
+  });
+  check('end time without a start → 400', endOnly.status === 400, `got ${endOnly.status}`);
+
+  // The whole point of keeping the past rule day-based: an early event stays
+  // live for the rest of its day.
+  const earlyToday = await call('/opportunities', {
+    method: 'POST', token: orgToken,
+    body: mkWhen({ title: 'Dawn shift', startTime: '06:00', endTime: '08:00' }),
+  });
+  const earlyId = earlyToday.body.opportunity._id;
+  const liveList = await call('/opportunities');
+  check(
+    'an event that started at 06:00 today is still listed',
+    liveList.body.opportunities.some((o) => o._id === earlyId),
+    'the past rule went time-based — it must stay day-based'
+  );
+  const joinEarly = await call(`/opportunities/${earlyId}/join`, { method: 'POST', token: vol2.body.token });
+  check('…and is still joinable → 201', joinEarly.status === 201, `got ${joinEarly.status}`);
+
+  const timedDetail = await call(`/opportunities/${timedId}`);
+  check('detail returns venue and times', timedDetail.body.opportunity.venue === 'Gate 3, Riverside Park'
+    && timedDetail.body.opportunity.startTime === '09:00');
+
+  const attendanceWhen = await call(`/opportunities/${timedId}/attendance`, { token: orgToken });
+  check('attendance payload carries the times for the manage screen',
+    attendanceWhen.body?.opportunity?.startTime === '09:00');
+
+  console.log('\n▶ AI description falls back safely with no key');
+  check('suite runs with no Gemini key', !process.env.GEMINI_API_KEY);
+  const aiWhen = await call('/ai/generate-description', {
+    method: 'POST', token: orgToken,
+    body: { title: 'Dawn shift', category: 'Community', location: 'Kolkata',
+            venue: 'Gate 3', startTime: '06:00', endTime: '08:00' },
+  });
+  check('generate still returns a description → 200', aiWhen.status === 200, `got ${aiWhen.status}`);
+  check('it is the offline template', aiWhen.body.source === 'mock');
+  check('the note explains why', /GEMINI_API_KEY/.test(aiWhen.body.note || ''));
+  check('no key is ever echoed back', !JSON.stringify(aiWhen.body).includes('AIza'));
 
   console.log('\n▶ Past events are hidden from discovery');
   const yesterday = new Date(Date.now() - 864e5);

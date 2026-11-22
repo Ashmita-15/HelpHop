@@ -11,6 +11,38 @@ import { mintCheckinToken, verifyCheckinToken } from '../utils/checkin.js';
 
 const DAY_MS = 864e5;
 
+/**
+ * The typed short code is only 6 digits, so without a limit someone could sit
+ * and guess inside its 60-second window. Ten wrong tries per volunteer per
+ * event buys back the margin. In-memory is fine: a restart clearing it is
+ * harmless, and this app runs as a single process.
+ */
+const FAILED_LIMIT = 10;
+const FAILED_WINDOW_MS = 10 * 60 * 1000;
+const failedAttempts = new Map();
+
+function recordFailure(key) {
+  const now = Date.now();
+  const entry = failedAttempts.get(key);
+  if (!entry || now - entry.first > FAILED_WINDOW_MS) {
+    failedAttempts.set(key, { count: 1, first: now });
+    return;
+  }
+  entry.count += 1;
+}
+
+function assertNotLockedOut(key) {
+  const entry = failedAttempts.get(key);
+  if (!entry) return;
+  if (Date.now() - entry.first > FAILED_WINDOW_MS) {
+    failedAttempts.delete(key);
+    return;
+  }
+  if (entry.count >= FAILED_LIMIT) {
+    throw httpError(429, 'Too many failed attempts — wait a few minutes and try again');
+  }
+}
+
 /** Loads an opportunity (with its secret) and verifies the caller owns it. */
 async function findOwned(id, user, { withSecret = false } = {}) {
   if (!mongoose.isValidObjectId(id)) throw httpError(404, 'Opportunity not found');
@@ -44,12 +76,12 @@ export const checkinToken = asyncHandler(async (req, res) => {
   const doc = await findOwned(req.params.id, req.user, { withSecret: true });
   if (doc.completedAt) throw httpError(409, 'This event has been completed');
 
-  const { token, expiresAt } = mintCheckinToken(doc.checkinSecret, doc._id.toString());
+  const { token, code, expiresAt } = mintCheckinToken(doc.checkinSecret, doc._id.toString());
   const origin = (process.env.CLIENT_ORIGIN || 'http://localhost:5173').split(',')[0].trim();
   const url = `${origin.replace(/\/$/, '')}/checkin/${doc._id}?t=${token}`;
 
   const qrDataUrl = await QRCode.toDataURL(url, { margin: 1, width: 320 });
-  res.json({ token, url, qrDataUrl, expiresAt });
+  res.json({ token, code, url, qrDataUrl, expiresAt });
 });
 
 // POST /api/opportunities/:id/checkin   (volunteer, body { token })
@@ -59,9 +91,14 @@ export const checkin = asyncHandler(async (req, res) => {
   const doc = await Opportunity.findById(req.params.id).select('+checkinSecret');
   if (!doc) throw httpError(404, 'Opportunity not found');
 
+  const throttleKey = `${req.user._id}:${doc._id}`;
+  assertNotLockedOut(throttleKey);
+
   if (!verifyCheckinToken(req.body?.token, doc.checkinSecret, doc._id.toString())) {
-    throw httpError(401, 'That QR code has expired — ask the organizer for the current one');
+    recordFailure(throttleKey);
+    throw httpError(401, 'That code has expired — check the organizer’s screen for the current one');
   }
+  failedAttempts.delete(throttleKey);
 
   assertCheckinWindow(doc);
 
@@ -113,6 +150,9 @@ export const listAttendance = asyncHandler(async (req, res) => {
       id: doc._id,
       title: doc.title,
       date: doc.date,
+      startTime: doc.startTime,
+      endTime: doc.endTime,
+      venue: doc.venue,
       gig: doc.gig,
       completedAt: doc.completedAt,
       requiredVolunteers: doc.requiredVolunteers,

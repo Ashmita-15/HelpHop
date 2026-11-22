@@ -5,6 +5,7 @@ import { api } from '../api/client.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { Alert, Badge, Icon, Loading, ProgressBar, Spinner, formatDate } from '../components/ui.jsx';
 import { gigLabel } from '../lib/gig.js';
+import { formatTimeRange } from '../lib/time.js';
 
 export default function OpportunityDetail() {
   const { id } = useParams();
@@ -80,9 +81,19 @@ export default function OpportunityDetail() {
     attended,
     gig,
     completedAt,
+    venue,
+    startTime,
+    endTime,
   } = opportunity;
 
   const reward = gigLabel(gig);
+  const timeRange = formatTimeRange(startTime, endTime);
+  const eventDay = new Date(date);
+  const now = new Date();
+  const isToday =
+    eventDay.getFullYear() === now.getFullYear() &&
+    eventDay.getMonth() === now.getMonth() &&
+    eventDay.getDate() === now.getDate();
   const startOfToday = new Date();
   startOfToday.setHours(0, 0, 0, 0);
   const finished = !!completedAt || new Date(date) < startOfToday;
@@ -149,8 +160,12 @@ export default function OpportunityDetail() {
 
         {/* Facts */}
         <dl className="grid gap-5 border-b border-ink-200/70 px-6 py-5 sm:grid-cols-3 sm:px-8">
-          <Detail icon="pin" label="Location" value={location} />
-          <Detail icon="calendar" label="Date" value={formatDate(date)} />
+          <Detail icon="pin" label="Location" value={venue ? `${location} · ${venue}` : location} />
+          <Detail
+            icon="calendar"
+            label={timeRange ? 'Date and time' : 'Date'}
+            value={timeRange ? `${formatDate(date)}, ${timeRange}` : formatDate(date)}
+          />
           <Detail
             icon="users"
             label="Volunteers"
@@ -231,6 +246,25 @@ export default function OpportunityDetail() {
                 {attended ? 'View your certificate' : 'My dashboard'}
               </Link>
             </div>
+          )}
+
+          {isVolunteer && !finished && joined && isToday && !attended && (
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-brand-200 bg-brand-50/70 px-4 py-3">
+              <p className="text-sm font-medium text-ink-700">
+                This is happening today — mark yourself present when you arrive.
+              </p>
+              <Link to={`/checkin/${opportunity._id}`} className="btn-primary btn-sm">
+                <Icon name="qr" className="h-3.5 w-3.5" />
+                Check in
+              </Link>
+            </div>
+          )}
+
+          {isVolunteer && !finished && joined && attended && (
+            <p className="mb-4 flex items-center gap-2 text-sm font-medium text-brand-700">
+              <Icon name="check" className="h-4 w-4" />
+              You&apos;re checked in for today.
+            </p>
           )}
 
           {isVolunteer &&

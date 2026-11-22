@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { Badge, Icon, ProgressBar, formatDate } from './ui.jsx';
 import { gigLabel, gigTone } from '../lib/gig.js';
+import { formatDateWithTime } from '../lib/time.js';
 
 /**
  * Summary card used on the landing page, the explore grid and both dashboards.
@@ -19,6 +20,8 @@ export default function OpportunityCard({ opportunity, footer }) {
     joined,
     gig,
     completedAt,
+    startTime,
+    endTime,
   } = opportunity;
 
   const orgName = organizationId?.name || 'An organization';
@@ -63,7 +66,7 @@ export default function OpportunityCard({ opportunity, footer }) {
           <div className="flex items-center gap-2">
             <Icon name="calendar" className="h-4 w-4 shrink-0 text-ink-400" />
             <dt className="sr-only">Date</dt>
-            <dd>{formatDate(date)}</dd>
+            <dd>{formatDateWithTime(formatDate(date), startTime, endTime)}</dd>
           </div>
           <div className="flex items-center gap-2">
             <Icon name="users" className="h-4 w-4 shrink-0 text-ink-400" />

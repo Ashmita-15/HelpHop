@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 
 import { api } from '../api/client.js';
 import { gigLabel } from '../lib/gig.js';
+import { formatDateWithTime } from '../lib/time.js';
 import {
   Alert,
   Badge,
@@ -172,7 +173,7 @@ export default function ManageEvent() {
       <PageHeader
         eyebrow={completed ? 'Completed event' : 'Live attendance'}
         title={opportunity.title}
-        description={`${formatDate(opportunity.date)} · ${counts.present} of ${counts.registered} volunteers checked in`}
+        description={`${formatDateWithTime(formatDate(opportunity.date), opportunity.startTime, opportunity.endTime)} · ${counts.present} of ${counts.registered} volunteers checked in`}
         actions={
           <Link to="/dashboard" className="btn-outline">
             <Icon name="arrowLeft" className="h-4 w-4" />
@@ -225,6 +226,18 @@ export default function ManageEvent() {
               ) : (
                 <Spinner className="h-7 w-7 text-brand-600" />
               )}
+            </div>
+
+            <div className="mt-4 rounded-xl border border-ink-200 bg-ink-50/70 px-4 py-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-ink-400">
+                Or read out this code
+              </p>
+              <p className="mt-1 font-mono text-3xl font-bold tracking-[0.3em] text-ink-900">
+                {qr?.code || '······'}
+              </p>
+              <p className="mt-1 text-xs text-ink-500">
+                For anyone who can&apos;t scan — they enter it under Check in.
+              </p>
             </div>
 
             <p className="mt-3 text-xs text-ink-400">

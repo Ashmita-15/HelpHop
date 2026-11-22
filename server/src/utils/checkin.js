@@ -13,13 +13,29 @@ const digest = (secret, opportunityId, slot) =>
     .digest('hex')
     .slice(0, 16);
 
+export const CODE_LENGTH = 6;
+
+/**
+ * The same signature rendered as digits, for volunteers who can't scan —
+ * no camera, no camera permission, or they're on a laptop.
+ */
+const shortCode = (secret, opportunityId, slot) =>
+  String(parseInt(digest(secret, opportunityId, slot).slice(0, 8), 16) % 10 ** CODE_LENGTH).padStart(
+    CODE_LENGTH,
+    '0'
+  );
+
 /** Token encoding the slot it was minted in, signed with the event's secret. */
 export function mintCheckinToken(secret, opportunityId, now = Date.now()) {
   const slot = currentSlot(now);
   const token = Buffer.from(`${slot}.${digest(secret, opportunityId, slot)}`).toString('base64url');
   // Expires at the end of the NEXT slot: we accept one slot of lag for clock
   // skew and for the seconds between scanning and the request landing.
-  return { token, expiresAt: new Date((slot + 2) * SLOT_MS) };
+  return {
+    token,
+    code: shortCode(secret, opportunityId, slot),
+    expiresAt: new Date((slot + 2) * SLOT_MS),
+  };
 }
 
 /**
@@ -28,6 +44,20 @@ export function mintCheckinToken(secret, opportunityId, now = Date.now()) {
  */
 export function verifyCheckinToken(token, secret, opportunityId, now = Date.now()) {
   if (typeof token !== 'string' || !token) return false;
+
+  const nowSlotForCode = currentSlot(now);
+  const trimmed = token.trim();
+
+  // A typed short code: accept the current slot or the previous one, same
+  // window the scanned token gets.
+  if (new RegExp(`^\\d{${CODE_LENGTH}}$`).test(trimmed)) {
+    return [nowSlotForCode, nowSlotForCode - 1].some((slot) => {
+      const expected = shortCode(secret, opportunityId, slot);
+      const a = Buffer.from(trimmed);
+      const b = Buffer.from(expected);
+      return a.length === b.length && crypto.timingSafeEqual(a, b);
+    });
+  }
 
   let decoded;
   try {

@@ -18,7 +18,10 @@ export const emptyOpportunity = {
   description: '',
   category: '',
   location: '',
+  venue: '',
   date: '',
+  startTime: '',
+  endTime: '',
   requiredVolunteers: 10,
   gigMode: 'none',
   gigAmount: '',
@@ -74,6 +77,9 @@ export default function OpportunityForm({
         title: form.title,
         category: form.category,
         location: form.location,
+        venue: form.venue,
+        startTime: form.startTime,
+        endTime: form.endTime,
       });
       setForm((f) => ({ ...f, description: res.description }));
       setAiNote(
@@ -117,10 +123,22 @@ export default function OpportunityForm({
       description: form.description.trim(),
       category: form.category,
       location: form.location.trim(),
+      venue: form.venue.trim(),
       date: form.date,
+      startTime: form.startTime,
+      endTime: form.endTime,
       requiredVolunteers: Number(form.requiredVolunteers),
       gig,
     };
+
+    if (payload.endTime && !payload.startTime) {
+      setError('Add a start time before an end time.');
+      return;
+    }
+    if (payload.startTime && payload.endTime && payload.endTime <= payload.startTime) {
+      setError('End time must be after the start time.');
+      return;
+    }
 
     if (
       !payload.title ||
@@ -156,7 +174,7 @@ export default function OpportunityForm({
 
       {/* ---------------------------------------------------------- basics */}
       <section className="card p-5 sm:p-6">
-        <h2 className="text-base font-semibold text-ink-900">The basics</h2>
+        <h2 className="text-base font-semibold text-ink-900">When and where</h2>
         <p className="mt-1 text-sm text-ink-500">
           This is what volunteers see on the card before they click through.
         </p>
@@ -210,6 +228,22 @@ export default function OpportunityForm({
                 onChange={set('location')}
                 required
               />
+              <p className="hint mt-1.5">The city or area volunteers search by.</p>
+            </div>
+
+            <div className="sm:col-span-2">
+              <label className="label" htmlFor="venue">
+                Venue <span className="font-normal text-ink-400">(optional)</span>
+              </label>
+              <input
+                id="venue"
+                className="input"
+                placeholder="Gate 3, Riverside Park"
+                maxLength={200}
+                value={form.venue}
+                onChange={set('venue')}
+              />
+              <p className="hint mt-1.5">Exactly where to meet once they arrive.</p>
             </div>
 
             <div>
@@ -224,6 +258,35 @@ export default function OpportunityForm({
                 onChange={set('date')}
                 required
               />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="label" htmlFor="startTime">
+                  Starts <span className="font-normal text-ink-400">(optional)</span>
+                </label>
+                <input
+                  id="startTime"
+                  type="time"
+                  className="input"
+                  value={form.startTime}
+                  onChange={set('startTime')}
+                />
+              </div>
+              <div>
+                <label className="label" htmlFor="endTime">
+                  Ends <span className="font-normal text-ink-400">(optional)</span>
+                </label>
+                <input
+                  id="endTime"
+                  type="time"
+                  className="input"
+                  value={form.endTime}
+                  onChange={set('endTime')}
+                  disabled={!form.startTime}
+                  title={form.startTime ? undefined : 'Set a start time first'}
+                />
+              </div>
             </div>
 
             <div>
