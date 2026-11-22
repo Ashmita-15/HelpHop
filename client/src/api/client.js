@@ -87,7 +87,12 @@ export const api = {
   attendance: (id) => request(`/opportunities/${id}/attendance`),
   markAttendance: (id, volunteerId, present) =>
     request(`/opportunities/${id}/attendance/${volunteerId}`, { method: 'PATCH', body: { present } }),
-  completeOpportunity: (id) => request(`/opportunities/${id}/complete`, { method: 'POST' }),
+  /** `confirmNoAttendees` acknowledges closing an event nobody was marked present at. */
+  completeOpportunity: (id, { confirmNoAttendees = false } = {}) =>
+    request(`/opportunities/${id}/complete`, { method: 'POST', body: { confirmNoAttendees } }),
+  /** Unlocks attendance on an event that was completed too soon. */
+  reopenOpportunity: (id) => request(`/opportunities/${id}/reopen`, { method: 'POST' }),
+  opportunityCertificates: (id) => request(`/opportunities/${id}/certificates`),
 
   // Gigs
   opportunityGigs: (id) => request(`/opportunities/${id}/gigs`),

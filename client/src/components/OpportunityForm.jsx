@@ -3,6 +3,7 @@ import { api } from '../api/client.js';
 import { Alert, Icon, Spinner } from './ui.jsx';
 import { ACCEPTED_TYPES, prepareCoverImage } from '../lib/image.js';
 import { categoryPhoto, photo as libraryPhoto } from '../lib/imagery.js';
+import { localOffsetMinutes } from '../lib/eventTime.js';
 
 const CATEGORIES = [
   'Environment',
@@ -176,6 +177,11 @@ export default function OpportunityForm({
       startTime: form.startTime,
       endTime: form.endTime,
       requiredVolunteers: Number(form.requiredVolunteers),
+      // The date and times above are wall clock with no timezone of their
+      // own. Sending this browser's offset lets the API resolve them into a
+      // real start and end instant, which is what "has it finished?" is
+      // decided on everywhere afterwards.
+      tzOffsetMinutes: localOffsetMinutes(),
       gig,
     };
 

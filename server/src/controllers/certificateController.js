@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
 
 import Certificate from '../models/Certificate.js';
+import Opportunity from '../models/Opportunity.js';
 import { asyncHandler, httpError } from '../middleware/error.js';
 import { streamCertificatePdf, verifyUrl } from '../utils/certificate.js';
 
@@ -50,13 +51,13 @@ export const downloadCertificate = asyncHandler(async (req, res) => {
   res.setHeader('Content-Type', 'application/pdf');
   res.setHeader(
     'Content-Disposition',
-    `attachment; filename="volunteerconnect-certificate-${cert.code}.pdf"`
+    `attachment; filename="helphop-certificate-${cert.code}.pdf"`
   );
 
   await streamCertificatePdf(res, {
     volunteerName: cert.volunteerId.name,
     eventTitle: cert.opportunityId.title,
-    orgName: cert.opportunityId.organizationId?.name || 'VolunteerConnect',
+    orgName: cert.opportunityId.organizationId?.name || 'HelpHop',
     eventDate: cert.opportunityId.date,
     issuedAt: cert.issuedAt,
     code: cert.code,
@@ -84,5 +85,38 @@ export const verifyCertificate = asyncHandler(async (req, res) => {
     eventDate: cert.opportunityId.date,
     eventLocation: cert.opportunityId.location,
     issuedAt: cert.issuedAt,
+  });
+});
+
+/**
+ * GET /api/opportunities/:id/certificates   (the organisation that owns it)
+ *
+ * Lets an organisation see exactly who was issued a certificate for one of
+ * its own events. Ownership is checked here rather than trusted from the
+ * client, and no other organisation's events are reachable through it.
+ */
+export const listOpportunityCertificates = asyncHandler(async (req, res) => {
+  if (!mongoose.isValidObjectId(req.params.id)) throw httpError(404, 'Opportunity not found');
+
+  const opportunity = await Opportunity.findById(req.params.id).select('organizationId title');
+  if (!opportunity) throw httpError(404, 'Opportunity not found');
+  if (opportunity.organizationId.toString() !== req.user._id.toString()) {
+    throw httpError(403, 'You can only see certificates for your own events');
+  }
+
+  const certs = await Certificate.find({ opportunityId: opportunity._id })
+    .populate('volunteerId', 'name email')
+    .sort({ issuedAt: 1 });
+
+  res.json({
+    certificates: certs
+      .filter((c) => c.volunteerId)
+      .map((c) => ({
+        id: c._id,
+        code: c.code,
+        issuedAt: c.issuedAt,
+        verifyUrl: verifyUrl(c.code),
+        volunteer: { id: c.volunteerId._id, name: c.volunteerId.name, email: c.volunteerId.email },
+      })),
   });
 });

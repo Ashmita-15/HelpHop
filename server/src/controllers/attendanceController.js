@@ -8,7 +8,7 @@ import GigAward from '../models/GigAward.js';
 import Certificate, { generateCertificateCode } from '../models/Certificate.js';
 import { asyncHandler, httpError } from '../middleware/error.js';
 import { mintCheckinToken, verifyCheckinToken } from '../utils/checkin.js';
-import { eventEndsAt, hasEnded } from '../utils/dates.js';
+import { eventEndsAt, eventStartsAt, hasEnded } from '../utils/dates.js';
 
 const DAY_MS = 864e5;
 
@@ -153,6 +153,11 @@ export const listAttendance = asyncHandler(async (req, res) => {
       date: doc.date,
       startTime: doc.startTime,
       endTime: doc.endTime,
+      // The resolved instants, so the browser decides "has it finished?"
+      // from exactly the same value the completion guard uses.
+      startsAt: doc.startsAt || eventStartsAt(doc),
+      endsAt: doc.endsAt || eventEndsAt(doc),
+      tzOffsetMinutes: doc.tzOffsetMinutes,
       venue: doc.venue,
       gig: doc.gig,
       completedAt: doc.completedAt,

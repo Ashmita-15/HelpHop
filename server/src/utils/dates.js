@@ -19,8 +19,14 @@
 /** Minutes east of UTC. Kolkata is +330, Chicago −360. */
 export const serverOffsetMinutes = (at = new Date()) => -new Date(at).getTimezoneOffset();
 
-/** Accepts an offset from a client, or null when it isn't usable. */
+/**
+ * Accepts an offset from a client, or null when it isn't usable.
+ * Note the explicit null/'' guard: Number(null) and Number('') are both 0,
+ * which would silently read "no offset recorded" as UTC.
+ */
 export function readOffsetMinutes(raw) {
+  if (raw === null || raw === undefined || raw === '') return null;
+
   const value = Number(raw);
   if (!Number.isFinite(value)) return null;
   // Real-world offsets run from −12:00 to +14:00.

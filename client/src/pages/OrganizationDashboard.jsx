@@ -5,6 +5,7 @@ import { api } from '../api/client.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import OpportunityCard from '../components/OpportunityCard.jsx';
 import { Sprig } from '../components/Ornament.jsx';
+import { hasEnded } from '../lib/eventTime.js';
 import {
   Alert,
   Avatar,
@@ -97,15 +98,14 @@ export default function OrganizationDashboard() {
 
   const { stats, opportunities } = data;
 
-  const startOfToday = new Date();
-  startOfToday.setHours(0, 0, 0, 0);
-  const isPast = (o) => new Date(o.date) < startOfToday;
-
+  // An event is waiting on the organisation the moment its scheduled end has
+  // passed — not at midnight. One that ran 09:00-13:00 today needs closing
+  // this afternoon, and used to sit silently under "Coming up" instead.
   const needsCompleting = opportunities
-    .filter((o) => isPast(o) && !o.completedAt)
+    .filter((o) => hasEnded(o) && !o.completedAt)
     .sort((a, b) => new Date(b.date) - new Date(a.date));
   const upcoming = opportunities
-    .filter((o) => !isPast(o) && !o.completedAt)
+    .filter((o) => !hasEnded(o) && !o.completedAt)
     .sort((a, b) => new Date(a.date) - new Date(b.date));
   const done = opportunities
     .filter((o) => o.completedAt)

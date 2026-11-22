@@ -5,6 +5,7 @@ import { api } from '../api/client.js';
 import { gigLabel } from '../lib/gig.js';
 import { formatDateWithTime } from '../lib/time.js';
 import { Sprig } from '../components/Ornament.jsx';
+import { hasEnded, untilEnd } from '../lib/eventTime.js';
 import {
   Alert,
   Avatar,
@@ -36,6 +37,7 @@ export default function ManageEvent() {
   const [savingId, setSavingId] = useState(null);
   const [confirming, setConfirming] = useState(false);
   const [completing, setCompleting] = useState(false);
+  const [reopening, setReopening] = useState(false);
   const [gigs, setGigs] = useState(null);
 
   // Keeps the polling effects from writing state after unmount. Set on mount
@@ -127,11 +129,11 @@ export default function ManageEvent() {
     }
   };
 
-  const complete = async () => {
+  const complete = async ({ confirmNoAttendees = false } = {}) => {
     setError('');
     setCompleting(true);
     try {
-      const res = await api.completeOpportunity(id);
+      const res = await api.completeOpportunity(id, { confirmNoAttendees });
       setNotice(
         `All done — ${res.certificates} certificate${res.certificates === 1 ? '' : 's'}` +
           (res.awards ? ` and ${res.awards} reward${res.awards === 1 ? '' : 's'} issued.` : ' issued.')
@@ -144,6 +146,21 @@ export default function ManageEvent() {
       setConfirming(false);
     } finally {
       setCompleting(false);
+    }
+  };
+
+  const reopen = async () => {
+    setError('');
+    setNotice('');
+    setReopening(true);
+    try {
+      const res = await api.reopenOpportunity(id);
+      setNotice(`${res.message}. Certificates already issued have been kept.`);
+      await loadRoster({ quiet: true });
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setReopening(false);
     }
   };
 
@@ -177,6 +194,12 @@ export default function ManageEvent() {
   const { opportunity, counts, roster } = data;
   const gig = gigLabel(opportunity.gig);
 
+  // Completion is gated on the event's real scheduled end, resolved by the
+  // API into an instant — not on the calendar date, which used to leave an
+  // event that finished at lunchtime looking like it was still to come.
+  const ended = hasEnded(opportunity);
+  const noneMarked = counts.present === 0;
+
   return (
     <div className="shell py-12 sm:py-16">
       <PageHeader
@@ -208,8 +231,24 @@ export default function ManageEvent() {
         )}
         {completed && (
           <Alert type="info">
-            Completed {formatDateTime(opportunity.completedAt)}. Attendance is locked and the
-            certificates have gone out.
+            <span className="flex flex-wrap items-center justify-between gap-3">
+              <span>
+                Completed {formatDateTime(opportunity.completedAt)}.{' '}
+                {counts.present > 0
+                  ? `${counts.present} certificate${counts.present === 1 ? '' : 's'} issued.`
+                  : 'Nobody was marked present, so no certificates were issued.'}{' '}
+                Attendance is locked.
+              </span>
+              <button
+                type="button"
+                className="btn-outline btn-sm shrink-0"
+                onClick={reopen}
+                disabled={reopening}
+              >
+                {reopening && <Spinner className="h-3.5 w-3.5" />}
+                {reopening ? 'Reopening…' : 'Reopen to fix attendance'}
+              </button>
+            </span>
           </Alert>
         )}
       </div>
@@ -281,15 +320,23 @@ export default function ManageEvent() {
                 </p>
               </div>
               {!completed && (
-                <button
-                  type="button"
-                  className="btn-primary btn-sm"
-                  onClick={() => setConfirming(true)}
-                  disabled={counts.registered === 0}
-                >
-                  <Icon name="check" className="h-3.5 w-3.5" />
-                  Complete event
-                </button>
+                <div className="text-right">
+                  <button
+                    type="button"
+                    className="btn-primary btn-sm"
+                    onClick={() => setConfirming(true)}
+                    disabled={!ended}
+                    title={ended ? undefined : 'You can complete this once the event has finished'}
+                  >
+                    <Icon name="check" className="h-3.5 w-3.5" />
+                    Complete event
+                  </button>
+                  {!ended && (
+                    <p className="mt-1.5 text-xs text-bark-400">
+                      Available {untilEnd(opportunity)}
+                    </p>
+                  )}
+                </div>
               )}
             </div>
 
@@ -401,27 +448,41 @@ export default function ManageEvent() {
           <div className="space-y-5 text-sm leading-relaxed text-bark-600">
             <p>
               <span className="font-serif text-xl text-bark-800">{counts.present}</span> of{' '}
-              {counts.registered} volunteers are marked present. Each of them will receive:
+              {counts.registered} volunteers are marked present.{' '}
+              {noneMarked ? 'Nobody will receive anything.' : 'Each of them will receive:'}
             </p>
-            <ul className="space-y-2.5">
-              <li className="flex items-center gap-2.5">
-                <Icon name="certificate" className="h-4 w-4 text-sage-600" />
-                A certificate of participation
-              </li>
-              {gig && (
+
+            {!noneMarked && (
+              <ul className="space-y-2.5">
                 <li className="flex items-center gap-2.5">
-                  <Icon
-                    name={opportunity.gig.mode === 'paid' ? 'wallet' : 'gift'}
-                    className="h-4 w-4 text-sage-600"
-                  />
-                  {gig}
+                  <Icon name="certificate" className="h-4 w-4 text-sage-600" />
+                  Their own certificate of participation
                 </li>
-              )}
-            </ul>
-            <Alert type="warning">
-              Attendance locks afterwards and the event can no longer be edited. Anyone not marked
-              present receives nothing.
-            </Alert>
+                {gig && (
+                  <li className="flex items-center gap-2.5">
+                    <Icon
+                      name={opportunity.gig.mode === 'paid' ? 'wallet' : 'gift'}
+                      className="h-4 w-4 text-sage-600"
+                    />
+                    {gig}
+                  </li>
+                )}
+              </ul>
+            )}
+
+            {noneMarked && counts.registered > 0 ? (
+              <Alert type="warning">
+                No certificates will be issued, because nobody has been ticked off the list. If
+                people did turn up, close this and mark them present first — it only takes a
+                moment, and it is what the certificates are generated from.
+              </Alert>
+            ) : (
+              <Alert type="warning">
+                Attendance locks afterwards and the event can no longer be edited. Anyone not
+                marked present receives nothing. You can reopen the event if you need to correct
+                it.
+              </Alert>
+            )}
           </div>
 
           <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
@@ -433,9 +494,18 @@ export default function ManageEvent() {
             >
               Not yet
             </button>
-            <button type="button" className="btn-primary" onClick={complete} disabled={completing}>
+            <button
+              type="button"
+              className={noneMarked && counts.registered > 0 ? 'btn-danger' : 'btn-primary'}
+              onClick={() => complete({ confirmNoAttendees: noneMarked })}
+              disabled={completing}
+            >
               {completing && <Spinner className="h-4 w-4" />}
-              {completing ? 'Issuing…' : `Complete and issue to ${counts.present}`}
+              {completing
+                ? 'Issuing…'
+                : noneMarked && counts.registered > 0
+                  ? 'Nobody came — close it anyway'
+                  : `Complete and issue to ${counts.present}`}
             </button>
           </div>
         </Modal>
