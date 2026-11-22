@@ -72,14 +72,14 @@ export default function QrScanner({ onResult, onError }) {
     (async () => {
       if (!navigator.mediaDevices?.getUserMedia) {
         // Also what you get on an insecure origin — the API simply isn't there.
-        fail('This browser cannot open the camera here. Enter the code instead.');
+        fail('This browser can’t open the camera here. Type the number instead.');
         return;
       }
 
       try {
         decode = await loadJsQR();
       } catch {
-        fail('Could not load the scanner. Enter the code instead.');
+        fail('The scanner didn’t load. Type the number instead.');
         return;
       }
 
@@ -105,8 +105,8 @@ export default function QrScanner({ onResult, onError }) {
       } catch (err) {
         fail(
           err?.name === 'NotAllowedError'
-            ? 'Camera access was blocked. Allow it in your browser, or enter the code instead.'
-            : 'No camera available. Enter the code instead.'
+            ? 'Camera access was blocked. Allow it in your browser, or type the number instead.'
+            : 'No camera available here. Type the number instead.'
         );
       }
     })();
@@ -122,16 +122,16 @@ export default function QrScanner({ onResult, onError }) {
   }
 
   return (
-    <div className="relative overflow-hidden rounded-xl border border-ink-200 bg-ink-900">
+    <div className="relative overflow-hidden rounded-field border border-bark-200 bg-bark-900">
       <video ref={videoRef} className="aspect-square w-full object-cover" muted playsInline />
       <canvas ref={canvasRef} className="hidden" />
 
       {/* Framing guide */}
       <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-        <div className="h-3/5 w-3/5 rounded-xl border-2 border-white/70 shadow-[0_0_0_9999px_rgba(0,0,0,0.35)]" />
+        <div className="h-3/5 w-3/5 rounded-field border-2 border-paper/75 shadow-[0_0_0_9999px_rgba(41,34,29,0.4)]" />
       </div>
 
-      <p className="absolute inset-x-0 bottom-0 flex items-center justify-center gap-2 bg-ink-900/70 py-2 text-xs font-medium text-white">
+      <p className="absolute inset-x-0 bottom-0 flex items-center justify-center gap-2 bg-bark-900/75 py-2.5 text-xs text-paper">
         {status === 'starting' ? (
           <>
             <Spinner className="h-3.5 w-3.5" />
@@ -140,7 +140,7 @@ export default function QrScanner({ onResult, onError }) {
         ) : (
           <>
             <Icon name="qr" className="h-3.5 w-3.5" />
-            Point at the organizer&apos;s QR code
+            Point it at the organiser&apos;s QR code
           </>
         )}
       </p>

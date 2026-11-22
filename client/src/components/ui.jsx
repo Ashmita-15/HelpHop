@@ -1,17 +1,24 @@
-/** Shared presentational primitives used across every page. */
+/**
+ * The shared kit. Everything visual that appears on more than one page lives
+ * here so a change to a badge or an empty state lands everywhere at once.
+ */
+
+import { useEffect, useRef } from 'react';
+import { Sprig } from './Ornament.jsx';
+import { photo as photoUrl } from '../lib/imagery.js';
 
 /* ---------------------------------------------------------------- icons */
 
 const iconBase = {
   fill: 'none',
   stroke: 'currentColor',
-  strokeWidth: 1.75,
+  strokeWidth: 1.5,
   strokeLinecap: 'round',
   strokeLinejoin: 'round',
   viewBox: '0 0 24 24',
 };
 
-/** Inline stroke icons — keeps the UI crisp where emoji looked informal. */
+/** Inline stroke icons, drawn at a lighter weight than the old set. */
 export function Icon({ name, className = 'h-4 w-4' }) {
   const paths = {
     pin: (
@@ -131,12 +138,76 @@ export function Icon({ name, className = 'h-4 w-4' }) {
         <path d="M5 20h14" />
       </>
     ),
+    leaf: (
+      <>
+        <path d="M4 20c0-8 5-14 16-15 1 10-4 15-11 15-2.5 0-5 0-5 0Z" />
+        <path d="M9 19c1.5-5 4-8 8-10" />
+      </>
+    ),
+    sun: (
+      <>
+        <circle cx="12" cy="12" r="4.2" />
+        <path d="M12 2v2.4M12 19.6V22M4.2 4.2l1.7 1.7M18.1 18.1l1.7 1.7M2 12h2.4M19.6 12H22M4.2 19.8l1.7-1.7M18.1 5.9l1.7-1.7" />
+      </>
+    ),
   };
 
   return (
     <svg {...iconBase} className={className} aria-hidden="true">
-      {paths[name]}
+      {paths[name] || paths.compass}
     </svg>
+  );
+}
+
+/* ------------------------------------------------------------ photography */
+
+/**
+ * A photograph. Always cropped server-side to the ratio it will occupy, so
+ * nothing reflows when it loads, and always carries real alt text.
+ */
+export function Photo({ id, alt, width = 800, ratio = 3 / 2, className = '', eager = false }) {
+  return (
+    <img
+      src={photoUrl(id, width, ratio)}
+      alt={alt}
+      loading={eager ? 'eager' : 'lazy'}
+      decoding="async"
+      className={`photo h-full w-full ${className}`}
+    />
+  );
+}
+
+/** A photograph with a caption set underneath, as in a printed feature. */
+export function Figure({ id, alt, caption, ratio = 3 / 2, width = 800, className = '', eager }) {
+  return (
+    <figure className={className}>
+      <div className="photo-frame" style={{ aspectRatio: ratio }}>
+        <Photo id={id} alt={alt} ratio={ratio} width={width} eager={eager} />
+      </div>
+      {caption && (
+        <figcaption className="mt-3 font-serif text-sm italic leading-relaxed text-bark-500">
+          {caption}
+        </figcaption>
+      )}
+    </figure>
+  );
+}
+
+/** Initial-circle stand-in for someone with no photograph. */
+export function Avatar({ name = '?', photoId, className = 'h-10 w-10' }) {
+  if (photoId) {
+    return (
+      <span className={`${className} shrink-0 overflow-hidden rounded-full bg-oat-200`}>
+        <Photo id={photoId} alt={name} width={96} ratio={1} />
+      </span>
+    );
+  }
+  return (
+    <span
+      className={`${className} flex shrink-0 items-center justify-center rounded-full bg-sage-100 font-serif text-sm text-sage-800`}
+    >
+      {name.charAt(0).toUpperCase()}
+    </span>
   );
 }
 
@@ -145,43 +216,50 @@ export function Icon({ name, className = 'h-4 w-4' }) {
 export function Spinner({ className = 'h-5 w-5' }) {
   return (
     <svg className={`animate-spin ${className}`} viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <circle className="opacity-20" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-      <path className="opacity-90" fill="currentColor" d="M4 12a8 8 0 0 1 8-8v4a4 4 0 0 0-4 4H4z" />
+      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2.5" />
+      <path
+        className="opacity-90"
+        stroke="currentColor"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+        d="M12 2a10 10 0 0 1 10 10"
+      />
     </svg>
   );
 }
 
-export function Loading({ label = 'Loading…' }) {
+export function Loading({ label = 'One moment…' }) {
   return (
-    <div className="flex flex-col items-center justify-center gap-3 py-24 text-ink-400">
-      <Spinner className="h-7 w-7 text-brand-600" />
-      <p className="text-sm font-medium">{label}</p>
+    <div className="flex flex-col items-center justify-center gap-4 py-28 text-bark-400">
+      <Spinner className="h-6 w-6 text-sage-600" />
+      <p className="font-serif text-sm italic">{label}</p>
     </div>
   );
 }
 
-/** Grey placeholder blocks that mirror the card grid while data loads. */
+/** Placeholder that mirrors the shape of an opportunity card while it loads. */
 export function CardSkeleton() {
   return (
-    <div className="card animate-pulse p-5">
-      <div className="h-5 w-24 rounded-full bg-ink-100" />
-      <div className="mt-4 h-5 w-3/4 rounded bg-ink-100" />
-      <div className="mt-2 h-4 w-1/2 rounded bg-ink-100" />
-      <div className="mt-5 space-y-2.5">
-        <div className="h-3 w-2/3 rounded bg-ink-100" />
-        <div className="h-3 w-1/2 rounded bg-ink-100" />
-        <div className="h-3 w-3/5 rounded bg-ink-100" />
+    <div className="card overflow-hidden" aria-hidden="true">
+      <div className="aspect-[3/2] animate-pulse bg-oat-100" />
+      <div className="animate-pulse p-5">
+        <div className="h-3 w-20 rounded-full bg-oat-100" />
+        <div className="mt-4 h-4 w-4/5 rounded bg-oat-100" />
+        <div className="mt-2 h-4 w-2/5 rounded bg-oat-100" />
+        <div className="mt-6 space-y-2.5">
+          <div className="h-2.5 w-2/3 rounded bg-oat-100" />
+          <div className="h-2.5 w-1/2 rounded bg-oat-100" />
+        </div>
       </div>
-      <div className="mt-5 h-1.5 w-full rounded-full bg-ink-100" />
     </div>
   );
 }
 
 const ALERT_STYLES = {
-  error: 'bg-rose-50 border-rose-200 text-rose-800',
-  success: 'bg-brand-50 border-brand-200 text-brand-800',
-  info: 'bg-ocean-50 border-ocean-200 text-ocean-800',
-  warning: 'bg-amber-50 border-amber-200 text-amber-900',
+  error: 'border-terra-200 bg-terra-50 text-terra-800',
+  success: 'border-sage-200 bg-sage-50 text-sage-800',
+  info: 'border-oat-200 bg-oat-50 text-bark-700',
+  warning: 'border-oat-400 bg-oat-100 text-bark-800',
 };
 
 export function Alert({ type = 'info', children, onDismiss }) {
@@ -190,14 +268,14 @@ export function Alert({ type = 'info', children, onDismiss }) {
   return (
     <div
       role={type === 'error' ? 'alert' : 'status'}
-      className={`flex animate-fade-in items-start gap-3 rounded-xl border px-4 py-3 text-sm ${ALERT_STYLES[type]}`}
+      className={`flex animate-appear items-start gap-3 rounded-card border px-4 py-3 text-sm leading-relaxed ${ALERT_STYLES[type]}`}
     >
       <span className="flex-1">{children}</span>
       {onDismiss && (
         <button
           type="button"
           onClick={onDismiss}
-          className="-mr-1 shrink-0 rounded-md p-1 opacity-50 transition hover:opacity-100"
+          className="-mr-1 shrink-0 rounded-full p-1 opacity-50 transition hover:opacity-100"
           aria-label="Dismiss"
         >
           <Icon name="close" className="h-3.5 w-3.5" />
@@ -207,15 +285,19 @@ export function Alert({ type = 'info', children, onDismiss }) {
   );
 }
 
-export function EmptyState({ icon = 'compass', title, message, action }) {
+/**
+ * Empty states carry a hand-drawn sprig instead of an icon tile — they should
+ * feel like a note left behind, not like a system message.
+ */
+export function EmptyState({ title, message, action, tone = 'sage' }) {
+  const tones = { sage: 'text-sage-400', oat: 'text-oat-500' };
+
   return (
-    <div className="card flex flex-col items-center gap-3 px-6 py-16 text-center">
-      <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-brand-50 text-brand-600">
-        <Icon name={icon} className="h-6 w-6" />
-      </div>
-      <h3 className="text-lg font-semibold text-ink-900">{title}</h3>
-      {message && <p className="max-w-md text-sm leading-relaxed text-ink-500">{message}</p>}
-      {action && <div className="mt-2">{action}</div>}
+    <div className="panel flex flex-col items-center gap-4 px-6 py-16 text-center">
+      <Sprig className={`h-8 w-8 ${tones[tone]}`} />
+      <h3 className="font-serif text-xl text-bark-700">{title}</h3>
+      {message && <p className="max-w-md text-sm leading-[1.75] text-bark-500">{message}</p>}
+      {action && <div className="mt-1">{action}</div>}
     </div>
   );
 }
@@ -223,17 +305,17 @@ export function EmptyState({ icon = 'compass', title, message, action }) {
 /* ----------------------------------------------------------------- atoms */
 
 const BADGE_TONES = {
-  brand: 'bg-brand-50 text-brand-700 ring-brand-200/70',
-  ocean: 'bg-ocean-50 text-ocean-700 ring-ocean-200/70',
-  neutral: 'bg-ink-100 text-ink-600 ring-ink-200',
-  amber: 'bg-amber-50 text-amber-800 ring-amber-200',
-  rose: 'bg-rose-50 text-rose-700 ring-rose-200',
+  sage: 'bg-sage-100 text-sage-800',
+  terra: 'bg-terra-100 text-terra-800',
+  oat: 'bg-oat-200 text-bark-700',
+  neutral: 'bg-bark-100 text-bark-600',
+  outline: 'border border-bark-300/80 text-bark-600',
 };
 
 export function Badge({ tone = 'neutral', icon, children }) {
   return (
     <span
-      className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ring-inset ${BADGE_TONES[tone]}`}
+      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[0.7rem] font-medium tracking-[0.02em] ${BADGE_TONES[tone]}`}
     >
       {icon && <Icon name={icon} className="h-3 w-3" />}
       {children}
@@ -241,97 +323,154 @@ export function Badge({ tone = 'neutral', icon, children }) {
   );
 }
 
-export function StatCard({ label, value, hint, icon, tone = 'brand' }) {
-  const tones = {
-    brand: 'bg-brand-50 text-brand-600',
-    ocean: 'bg-ocean-50 text-ocean-600',
-    neutral: 'bg-ink-100 text-ink-600',
-  };
+/**
+ * One figure in a dashboard summary. Set as a ruled column rather than a
+ * boxed metric tile, which is what makes dashboards read as admin software.
+ */
+export function StatCard({ label, value, hint, icon, tone = 'sage' }) {
+  const tones = { sage: 'text-sage-600', terra: 'text-terra-600', neutral: 'text-bark-400' };
 
   return (
-    <div className="card p-5 transition-shadow duration-300 hover:shadow-card">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-sm font-medium text-ink-500">{label}</p>
-          <p className="mt-1 text-3xl font-bold tracking-tight text-ink-900">{value}</p>
-          {hint && <p className="mt-1 text-xs text-ink-400">{hint}</p>}
-        </div>
-        {icon && (
-          <span className={`flex h-9 w-9 items-center justify-center rounded-xl ${tones[tone]}`}>
-            <Icon name={icon} className="h-4 w-4" />
-          </span>
-        )}
+    <div className="flex items-start gap-3 border-t border-bark-200/70 pt-4">
+      {icon && (
+        <span className={`mt-1 shrink-0 ${tones[tone]}`}>
+          <Icon name={icon} className="h-4 w-4" />
+        </span>
+      )}
+      <div className="min-w-0">
+        <p className="font-serif text-3xl leading-none text-bark-700">{value}</p>
+        <p className="mt-2 text-sm text-bark-600">{label}</p>
+        {hint && <p className="mt-0.5 text-xs text-bark-400">{hint}</p>}
       </div>
     </div>
   );
 }
 
-/** Thin capacity bar shared by cards and the detail page. */
-export function ProgressBar({ value, max, className = 'h-1.5' }) {
+/** Thin capacity bar shared by cards, the detail page and dashboards. */
+export function ProgressBar({ value, max, className = 'h-1' }) {
   const pct = max > 0 ? Math.min(100, Math.round((value / max) * 100)) : 0;
   const full = value >= max;
 
   return (
     <div
-      className={`w-full overflow-hidden rounded-full bg-ink-100 ${className}`}
+      className={`w-full overflow-hidden rounded-full bg-oat-200 ${className}`}
       role="progressbar"
       aria-valuenow={value}
       aria-valuemin={0}
       aria-valuemax={max}
     >
       <div
-        className={`h-full rounded-full transition-all duration-500 ${full ? 'bg-amber-400' : 'bg-brand-500'}`}
+        className={`h-full rounded-full transition-[width] duration-700 ease-natural ${
+          full ? 'bg-oat-500' : 'bg-sage-500'
+        }`}
         style={{ width: `${pct}%` }}
       />
     </div>
   );
 }
 
+/* --------------------------------------------------------------- overlays */
+
+/**
+ * Modal. Closes on Escape and on a click outside, traps nothing fancier than
+ * an initial focus move — which is all these three dialogs need.
+ */
 export function Modal({ title, subtitle, onClose, children }) {
+  const panel = useRef(null);
+
+  useEffect(() => {
+    const onKey = (e) => e.key === 'Escape' && onClose?.();
+    document.addEventListener('keydown', onKey);
+    panel.current?.focus();
+
+    // Stop the page behind the dialog from scrolling under it.
+    const { overflow } = document.body.style;
+    document.body.style.overflow = 'hidden';
+
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.body.style.overflow = overflow;
+    };
+  }, [onClose]);
+
   return (
     <div
-      className="fixed inset-0 z-50 flex animate-fade-in items-end justify-center bg-ink-900/40 backdrop-blur-sm sm:items-center sm:p-4"
+      className="fixed inset-0 z-50 flex animate-appear items-end justify-center bg-bark-900/35 sm:items-center sm:p-4"
       onClick={onClose}
       role="presentation"
     >
       <div
-        className="max-h-[88vh] w-full max-w-lg animate-fade-up overflow-y-auto rounded-t-2xl bg-white shadow-lift sm:rounded-2xl"
+        ref={panel}
+        tabIndex={-1}
+        className="max-h-[88vh] w-full max-w-lg animate-rise overflow-y-auto rounded-t-card bg-paper shadow-lift focus:outline-none sm:rounded-card"
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
         aria-label={title}
       >
-        <div className="sticky top-0 flex items-start justify-between gap-4 border-b border-ink-200/70 bg-white/95 px-5 py-4 backdrop-blur">
+        <div className="sticky top-0 flex items-start justify-between gap-4 border-b border-bark-200/70 bg-paper/95 px-5 py-4 backdrop-blur">
           <div className="min-w-0">
-            <h2 className="truncate text-base font-semibold text-ink-900">{title}</h2>
-            {subtitle && <p className="mt-0.5 text-sm text-ink-500">{subtitle}</p>}
+            <h2 className="truncate font-serif text-lg text-bark-700">{title}</h2>
+            {subtitle && <p className="mt-0.5 text-sm text-bark-500">{subtitle}</p>}
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="-mr-1 shrink-0 rounded-lg p-1.5 text-ink-400 transition hover:bg-ink-100 hover:text-ink-700"
+            className="-mr-1 shrink-0 rounded-full p-1.5 text-bark-400 transition hover:bg-bark-100 hover:text-bark-700"
             aria-label="Close"
           >
             <Icon name="close" className="h-4 w-4" />
           </button>
         </div>
-        <div className="px-5 py-4">{children}</div>
+        <div className="px-5 py-5">{children}</div>
       </div>
     </div>
   );
 }
 
-/** Consistent page heading used by every inner page. */
+/* -------------------------------------------------------------- headings */
+
+/** The heading every inner page opens with. */
 export function PageHeader({ eyebrow, title, description, actions }) {
   return (
-    <header className="flex flex-wrap items-end justify-between gap-4 pb-6">
-      <div>
-        {eyebrow && <p className="eyebrow mb-2">{eyebrow}</p>}
-        <h1 className="text-2xl font-bold tracking-tight text-ink-900 sm:text-3xl">{title}</h1>
-        {description && <p className="mt-1.5 text-sm text-ink-500">{description}</p>}
+    <header className="flex flex-wrap items-end justify-between gap-6 border-b border-bark-200/70 pb-8">
+      <div className="min-w-0">
+        {eyebrow && (
+          <p className="eyebrow mb-3 flex items-center gap-2">
+            <Sprig className="h-3.5 w-3.5 text-sage-400" />
+            {eyebrow}
+          </p>
+        )}
+        <h1 className="h-title">{title}</h1>
+        {description && <p className="mt-3 max-w-prose text-[0.95rem] leading-relaxed text-bark-500">{description}</p>}
       </div>
       {actions && <div className="flex flex-wrap gap-2">{actions}</div>}
     </header>
+  );
+}
+
+/** A heading inside a page or a landing section. */
+export function SectionHeading({ eyebrow, title, description, action, align = 'left' }) {
+  const centred = align === 'center';
+
+  return (
+    <div
+      className={`flex flex-wrap items-end gap-6 ${
+        centred ? 'flex-col items-center text-center' : 'justify-between'
+      }`}
+    >
+      <div className={centred ? 'max-w-2xl' : 'max-w-2xl'}>
+        {eyebrow && (
+          <p className={`eyebrow mb-3 flex items-center gap-2 ${centred ? 'justify-center' : ''}`}>
+            <Sprig className="h-3.5 w-3.5 text-sage-400" />
+            {eyebrow}
+          </p>
+        )}
+        <h2 className="h-title">{title}</h2>
+        {description && <p className={`lede mt-4 ${centred ? 'mx-auto' : ''}`}>{description}</p>}
+      </div>
+      {action && <div className="shrink-0">{action}</div>}
+    </div>
   );
 }
 
@@ -356,3 +495,11 @@ export const formatDateTime = (value) =>
     hour: 'numeric',
     minute: '2-digit',
   });
+
+/** "Good morning" / "Good afternoon" / "Good evening", for dashboard greetings. */
+export const greeting = (date = new Date()) => {
+  const h = date.getHours();
+  if (h < 12) return 'Good morning';
+  if (h < 18) return 'Good afternoon';
+  return 'Good evening';
+};

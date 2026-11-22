@@ -1,80 +1,91 @@
 /** @type {import('tailwindcss').Config} */
+
+/**
+ * Every colour here points at a CSS custom property declared in src/index.css.
+ * The properties hold raw channels ("113 131 107") so Tailwind's opacity
+ * modifiers (bg-sage-500/20) keep working, and the palette can be inspected or
+ * themed from one place instead of being scattered through components.
+ */
+const token = (name) => `rgb(var(--${name}) / <alpha-value>)`;
+
+const scale = (prefix, steps) =>
+  Object.fromEntries(steps.map((s) => [s, token(`${prefix}-${s}`)]));
+
 export default {
   content: ['./index.html', './src/**/*.{js,jsx}'],
   theme: {
     extend: {
       colors: {
-        // Primary — community, growth, positive impact.
-        brand: {
-          50: '#eefbf3',
-          100: '#d5f5e3',
-          200: '#aeeaca',
-          300: '#79d9aa',
-          400: '#42c186',
-          500: '#1da76a',
-          600: '#118655',
-          700: '#0e6b46',
-          800: '#0f5539',
-          900: '#0d4630',
-          950: '#04281b',
-        },
-        // Secondary — trust, used for accents and links.
-        ocean: {
-          50: '#eff7ff',
-          100: '#daedff',
-          200: '#bee0ff',
-          300: '#91cdff',
-          400: '#5eb1fc',
-          500: '#3891f7',
-          600: '#2273ec',
-          700: '#1a5cd9',
-          800: '#1c4caf',
-          900: '#1c438a',
-        },
-        // Neutral text/surface scale.
-        ink: {
-          50: '#f7f8f9',
-          100: '#eef0f2',
-          200: '#dfe3e7',
-          300: '#c6ccd3',
-          400: '#98a2ad',
-          500: '#6b7682',
-          600: '#4d5661',
-          700: '#3b434c',
-          800: '#262c33',
-          900: '#161b20',
-        },
+        // Page and card grounds.
+        linen: token('linen'),
+        paper: token('paper'),
+
+        // Sage — the brand. Buttons and primary actions use 600/700 so text
+        // on top of them clears AA contrast.
+        sage: scale('sage', [50, 100, 200, 300, 400, 500, 600, 700, 800, 900]),
+
+        // Terracotta — used sparingly, for emphasis and the organisation side.
+        terra: scale('terra', [50, 100, 200, 300, 400, 500, 600, 700, 800]),
+
+        // Oat — secondary surfaces and warm dividers.
+        oat: scale('oat', [50, 100, 200, 300, 400, 500, 600]),
+
+        // Bark — warm neutral text scale. 700 is espresso, 500 muted brown.
+        bark: scale('bark', [50, 100, 200, 300, 400, 500, 600, 700, 800, 900]),
       },
+
       fontFamily: {
-        sans: ['Inter', 'ui-sans-serif', 'system-ui', '-apple-system', 'sans-serif'],
+        serif: ['Lora', 'Iowan Old Style', 'Georgia', 'serif'],
+        sans: ['DM Sans', 'ui-sans-serif', 'system-ui', '-apple-system', 'sans-serif'],
       },
-      letterSpacing: {
-        tighter: '-0.03em',
+
+      fontSize: {
+        // Editorial display sizes that scale with the viewport rather than
+        // jumping at breakpoints.
+        display: ['clamp(2.45rem, 1.3rem + 4.2vw, 4.1rem)', { lineHeight: '1.05', letterSpacing: '-0.021em' }],
+        title: ['clamp(1.85rem, 1.2rem + 2.1vw, 2.75rem)', { lineHeight: '1.14', letterSpacing: '-0.016em' }],
+        heading: ['clamp(1.35rem, 1.1rem + 0.9vw, 1.7rem)', { lineHeight: '1.25', letterSpacing: '-0.011em' }],
       },
+
+      borderRadius: {
+        card: 'var(--radius-card)',
+        field: 'var(--radius-field)',
+      },
+
       boxShadow: {
-        soft: '0 1px 2px rgba(22, 27, 32, 0.04), 0 1px 3px rgba(22, 27, 32, 0.06)',
-        card: '0 1px 3px rgba(22, 27, 32, 0.05), 0 8px 24px -12px rgba(22, 27, 32, 0.12)',
-        lift: '0 2px 6px rgba(22, 27, 32, 0.06), 0 18px 40px -18px rgba(22, 27, 32, 0.22)',
-        ring: '0 0 0 1px rgba(22, 27, 32, 0.06)',
+        // Warm-tinted and deliberately shallow — no floating app cards.
+        raise: '0 1px 2px rgb(73 61 52 / 0.05), 0 10px 26px -20px rgb(73 61 52 / 0.35)',
+        lift: '0 2px 4px rgb(73 61 52 / 0.05), 0 22px 44px -28px rgb(73 61 52 / 0.42)',
+        inset: 'inset 0 1px 0 rgb(255 252 247 / 0.6)',
       },
-      backgroundImage: {
-        'brand-gradient': 'linear-gradient(135deg, #0e6b46 0%, #118655 45%, #1a5cd9 100%)',
-        'hero-glow':
-          'radial-gradient(60% 60% at 15% 10%, rgba(29,167,106,0.14) 0%, transparent 60%), radial-gradient(50% 50% at 90% 0%, rgba(56,145,247,0.12) 0%, transparent 60%)',
+
+      maxWidth: {
+        prose: '64ch',
       },
+
       keyframes: {
-        'fade-up': {
-          from: { opacity: '0', transform: 'translateY(8px)' },
+        rise: {
+          from: { opacity: '0', transform: 'translateY(10px)' },
           to: { opacity: '1', transform: 'translateY(0)' },
         },
-        'fade-in': {
+        appear: {
           from: { opacity: '0' },
           to: { opacity: '1' },
         },
+        draw: {
+          from: { strokeDashoffset: '240' },
+          to: { strokeDashoffset: '0' },
+        },
       },
+
       animation: {
-        'fade-up': 'fade-up 0.4s ease-out both',
-        'fade-in': 'fade-in 0.25s ease-out both',
+        rise: 'rise 0.55s cubic-bezier(0.22, 0.61, 0.36, 1) both',
+        appear: 'appear 0.3s ease-out both',
+        draw: 'draw 1.1s ease-out 0.2s both',
+      },
+
+      transitionTimingFunction: {
+        natural: 'cubic-bezier(0.22, 0.61, 0.36, 1)',
       },
     },
   },

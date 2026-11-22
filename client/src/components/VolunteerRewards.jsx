@@ -5,7 +5,7 @@ import { gigLabel } from '../lib/gig.js';
 import { certificateFilename, saveBlob } from '../lib/download.js';
 import { Alert, Badge, Icon, Spinner, formatDate } from './ui.jsx';
 
-/** A volunteer's earned gigs and certificates, shown under their dashboard. */
+/** A volunteer's earned rewards and certificates, under their shelf. */
 export default function VolunteerRewards() {
   const [gigs, setGigs] = useState(null);
   const [certificates, setCertificates] = useState(null);
@@ -39,32 +39,38 @@ export default function VolunteerRewards() {
   if (gigs.length === 0 && certificates.length === 0) return null;
 
   return (
-    <div className="mt-10 space-y-6">
-      {error && <Alert type="error" onDismiss={() => setError('')}>{error}</Alert>}
+    <div className="mt-16 space-y-14">
+      {error && (
+        <Alert type="error" onDismiss={() => setError('')}>
+          {error}
+        </Alert>
+      )}
 
       {gigs.length > 0 && (
         <section>
-          <h2 className="flex items-center gap-2 text-lg font-semibold tracking-tight text-ink-900">
-            <Icon name="gift" className="h-4 w-4 text-brand-600" />
-            Your gigs
-          </h2>
-          <p className="mt-1 text-sm text-ink-500">
-            Earned by attending. The organization settles these directly with you.
-          </p>
+          <div className="border-b border-bark-200/70 pb-4">
+            <h2 className="flex items-center gap-2.5 font-serif text-xl text-bark-700">
+              <Icon name="gift" className="h-4 w-4 text-terra-600" />
+              Promised to you
+            </h2>
+            <p className="mt-1.5 text-sm leading-relaxed text-bark-500">
+              Earned by turning up. The organisation settles these with you directly.
+            </p>
+          </div>
 
-          <ul className="card mt-4 divide-y divide-ink-200/70">
+          <ul className="divide-y divide-bark-200/70">
             {gigs.map((g) => (
-              <li key={g._id} className="flex flex-wrap items-center gap-3 px-5 py-3.5">
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-semibold text-ink-900">
+              <li key={g._id} className="flex flex-wrap items-center gap-x-4 gap-y-2 py-4">
+                <div className="min-w-0 flex-1 basis-48">
+                  <p className="truncate text-sm text-bark-800">
                     {g.opportunity?.title || 'Event removed'}
                   </p>
-                  <p className="truncate text-xs text-ink-500">
+                  <p className="truncate text-xs text-bark-500">
                     {g.opportunity?.organization}
                     {g.opportunity?.date ? ` · ${formatDate(g.opportunity.date)}` : ''}
                   </p>
                 </div>
-                <span className="text-sm font-semibold text-ink-900">
+                <span className="font-serif text-base text-bark-700">
                   {gigLabel({
                     mode: g.mode,
                     amount: g.amount,
@@ -72,7 +78,7 @@ export default function VolunteerRewards() {
                     perkTitle: g.perkTitle,
                   })}
                 </span>
-                <Badge tone={g.status === 'settled' ? 'brand' : 'amber'}>
+                <Badge tone={g.status === 'settled' ? 'sage' : 'oat'}>
                   {g.status === 'settled' ? 'Received' : 'Awaiting'}
                 </Badge>
               </li>
@@ -83,31 +89,33 @@ export default function VolunteerRewards() {
 
       {certificates.length > 0 && (
         <section>
-          <h2 className="flex items-center gap-2 text-lg font-semibold tracking-tight text-ink-900">
-            <Icon name="certificate" className="h-4 w-4 text-brand-600" />
-            Your certificates
-          </h2>
-          <p className="mt-1 text-sm text-ink-500">
-            Each one carries a QR anybody can scan to confirm it is genuine.
-          </p>
+          <div className="border-b border-bark-200/70 pb-4">
+            <h2 className="flex items-center gap-2.5 font-serif text-xl text-bark-700">
+              <Icon name="certificate" className="h-4 w-4 text-sage-600" />
+              Your certificates
+            </h2>
+            <p className="mt-1.5 text-sm leading-relaxed text-bark-500">
+              Each one carries a code anybody can scan to confirm it is real.
+            </p>
+          </div>
 
-          <ul className="card mt-4 divide-y divide-ink-200/70">
+          <ul className="divide-y divide-bark-200/70">
             {certificates.map((c) => (
-              <li key={c.id} className="flex flex-wrap items-center gap-3 px-5 py-3.5">
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-semibold text-ink-900">{c.opportunity.title}</p>
-                  <p className="truncate text-xs text-ink-500">
+              <li key={c.id} className="flex flex-wrap items-center gap-x-4 gap-y-2 py-4">
+                <div className="min-w-0 flex-1 basis-48">
+                  <p className="truncate text-sm text-bark-800">{c.opportunity.title}</p>
+                  <p className="truncate text-xs text-bark-500">
                     {c.opportunity.organization} · Issued {formatDate(c.issuedAt)}
                   </p>
                 </div>
-                <code className="hidden text-xs font-semibold tracking-wide text-ink-400 sm:block">
+                <code className="hidden font-mono text-xs tracking-wide text-bark-400 sm:block">
                   {c.code}
                 </code>
                 <button
                   type="button"
                   onClick={() => download(c)}
                   disabled={downloading === c.id}
-                  className="btn-secondary btn-sm"
+                  className="btn-outline btn-sm"
                 >
                   {downloading === c.id ? (
                     <Spinner className="h-3.5 w-3.5" />

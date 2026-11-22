@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 
 import { Icon } from './ui.jsx';
+import { Sprig } from './Ornament.jsx';
 import { formatTimeRange } from '../lib/time.js';
 
 const isToday = (value) => {
@@ -14,38 +15,38 @@ const isToday = (value) => {
 };
 
 /**
- * Check-in is only findable if we put it in front of the volunteer on the day.
- * Shows today's joined events with a direct way in; renders nothing otherwise.
+ * Check-in is only findable if it is put in front of the volunteer on the
+ * day. Shows today's claimed events with a direct way in; renders nothing
+ * on every other day.
  */
 export default function CheckinBanner({ events = [] }) {
   const today = events.filter((o) => isToday(o.date) && !o.completedAt && !o.attended);
   if (today.length === 0) return null;
 
   return (
-    <section className="mt-6 rounded-2xl border border-brand-200 bg-brand-50/70 p-5">
-      <div className="flex items-start gap-3">
-        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-brand-600 ring-1 ring-brand-200">
-          <Icon name="qr" className="h-5 w-5" />
-        </span>
+    <section className="mt-10 rounded-card border border-sage-200 bg-sage-50 p-6 sm:p-7">
+      <div className="flex items-start gap-4">
+        <Sprig className="mt-0.5 hidden h-6 w-6 shrink-0 text-sage-500 sm:block" />
         <div className="min-w-0 flex-1">
-          <h2 className="text-base font-semibold text-ink-900">
-            {today.length === 1 ? 'Happening today' : `${today.length} events happening today`}
+          <h2 className="font-serif text-xl text-sage-900">
+            {today.length === 1 ? 'Today’s the day' : `${today.length} things on today`}
           </h2>
-          <p className="mt-0.5 text-sm text-ink-600">
-            Scan the organizer&apos;s QR code or enter their 6-digit code to mark yourself present.
+          <p className="mt-1.5 text-sm leading-relaxed text-sage-800">
+            Scan the organiser&apos;s QR code, or type the six-digit number they read out, to mark
+            yourself present.
           </p>
 
-          <ul className="mt-4 space-y-2">
+          <ul className="mt-5 space-y-2.5">
             {today.map((o) => {
               const range = formatTimeRange(o.startTime, o.endTime);
               return (
                 <li
                   key={o._id}
-                  className="flex flex-wrap items-center gap-3 rounded-xl bg-white px-4 py-3 ring-1 ring-brand-100"
+                  className="flex flex-wrap items-center gap-3 rounded-field border border-sage-200/80 bg-paper px-4 py-3"
                 >
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-semibold text-ink-900">{o.title}</p>
-                    <p className="truncate text-xs text-ink-500">
+                    <p className="truncate text-sm text-bark-800">{o.title}</p>
+                    <p className="truncate text-xs text-bark-500">
                       {o.venue || o.location}
                       {range ? ` · ${range}` : ''}
                     </p>

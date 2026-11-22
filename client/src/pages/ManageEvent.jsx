@@ -4,8 +4,10 @@ import { Link, useParams } from 'react-router-dom';
 import { api } from '../api/client.js';
 import { gigLabel } from '../lib/gig.js';
 import { formatDateWithTime } from '../lib/time.js';
+import { Sprig } from '../components/Ornament.jsx';
 import {
   Alert,
+  Avatar,
   Badge,
   Icon,
   Loading,
@@ -70,7 +72,9 @@ export default function ManageEvent() {
     }
   }, [id]);
 
-  useEffect(() => { loadRoster(); }, [loadRoster]);
+  useEffect(() => {
+    loadRoster();
+  }, [loadRoster]);
 
   const completed = !!data?.opportunity?.completedAt;
 
@@ -81,7 +85,9 @@ export default function ManageEvent() {
     return () => clearInterval(t);
   }, [completed, loadRoster]);
 
-  useEffect(() => { if (completed) loadGigs(); }, [completed, loadGigs]);
+  useEffect(() => {
+    if (completed) loadGigs();
+  }, [completed, loadGigs]);
 
   // Rotating check-in QR.
   useEffect(() => {
@@ -102,7 +108,10 @@ export default function ManageEvent() {
 
     refresh();
     const t = setInterval(refresh, QR_REFRESH_MS);
-    return () => { cancelled = true; clearInterval(t); };
+    return () => {
+      cancelled = true;
+      clearInterval(t);
+    };
   }, [id, completed]);
 
   const toggle = async (row) => {
@@ -124,8 +133,8 @@ export default function ManageEvent() {
     try {
       const res = await api.completeOpportunity(id);
       setNotice(
-        `Event completed — ${res.certificates} certificate${res.certificates === 1 ? '' : 's'}` +
-          (res.awards ? ` and ${res.awards} gig${res.awards === 1 ? '' : 's'} issued.` : ' issued.')
+        `All done — ${res.certificates} certificate${res.certificates === 1 ? '' : 's'}` +
+          (res.awards ? ` and ${res.awards} reward${res.awards === 1 ? '' : 's'} issued.` : ' issued.')
       );
       setConfirming(false);
       await loadRoster({ quiet: true });
@@ -151,15 +160,15 @@ export default function ManageEvent() {
     }
   };
 
-  if (loading) return <Loading label="Loading event…" />;
+  if (loading) return <Loading label="Opening the register…" />;
 
   if (!data) {
     return (
-      <div className="shell-narrow space-y-4 py-20 text-center">
-        <Alert type="error">{error || 'Event not found.'}</Alert>
+      <div className="shell-narrow space-y-6 py-24 text-center">
+        <Alert type="error">{error || 'We couldn’t find that event.'}</Alert>
         <Link to="/dashboard" className="btn-outline">
           <Icon name="arrowLeft" className="h-4 w-4" />
-          Back to dashboard
+          Back to your desk
         </Link>
       </div>
     );
@@ -169,79 +178,92 @@ export default function ManageEvent() {
   const gig = gigLabel(opportunity.gig);
 
   return (
-    <div className="shell py-10 sm:py-12">
+    <div className="shell py-12 sm:py-16">
       <PageHeader
-        eyebrow={completed ? 'Completed event' : 'Live attendance'}
+        eyebrow={completed ? 'A finished event' : 'On the day'}
         title={opportunity.title}
-        description={`${formatDateWithTime(formatDate(opportunity.date), opportunity.startTime, opportunity.endTime)} · ${counts.present} of ${counts.registered} volunteers checked in`}
+        description={formatDateWithTime(
+          formatDate(opportunity.date),
+          opportunity.startTime,
+          opportunity.endTime
+        )}
         actions={
           <Link to="/dashboard" className="btn-outline">
             <Icon name="arrowLeft" className="h-4 w-4" />
-            Dashboard
+            Your desk
           </Link>
         }
       />
 
-      <div className="space-y-4">
-        {error && <Alert type="error" onDismiss={() => setError('')}>{error}</Alert>}
-        {notice && <Alert type="success" onDismiss={() => setNotice('')}>{notice}</Alert>}
+      <div className="mt-6 space-y-3">
+        {error && (
+          <Alert type="error" onDismiss={() => setError('')}>
+            {error}
+          </Alert>
+        )}
+        {notice && (
+          <Alert type="success" onDismiss={() => setNotice('')}>
+            {notice}
+          </Alert>
+        )}
         {completed && (
           <Alert type="info">
-            Completed {formatDateTime(opportunity.completedAt)}. Attendance is locked and
-            certificates have been issued.
+            Completed {formatDateTime(opportunity.completedAt)}. Attendance is locked and the
+            certificates have gone out.
           </Alert>
         )}
       </div>
 
-      <div className="mt-6 grid gap-4 sm:grid-cols-3">
-        <StatCard label="Checked in" value={counts.present} icon="check" />
-        <StatCard label="Registered" value={counts.registered} icon="users" tone="ocean" />
+      <div className="mt-10 grid gap-8 sm:grid-cols-3">
+        <StatCard label="Checked in" value={counts.present} hint="So far today" />
+        <StatCard label="Signed up" value={counts.registered} hint="Expected" tone="terra" />
         <StatCard
-          label="Reward each"
-          value={gig || 'None'}
-          icon={opportunity.gig?.mode === 'paid' ? 'wallet' : 'gift'}
+          label="Each volunteer gets"
+          value={gig || 'A certificate'}
+          hint={
+            opportunity.gig?.mode === 'paid' ? 'Settled by you, outside HelpHop' : 'Plus a certificate'
+          }
           tone="neutral"
-          hint={opportunity.gig?.mode === 'paid' ? 'Paid by you, outside the app' : undefined}
         />
       </div>
 
-      <div className="mt-8 grid gap-6 lg:grid-cols-[22rem_1fr]">
+      <div className="mt-14 grid gap-10 lg:grid-cols-[21rem_1fr] lg:gap-14">
         {/* ------------------------------------------------------------ QR */}
         {!completed && (
-          <section className="card h-fit p-5 text-center">
-            <h2 className="flex items-center justify-center gap-2 text-base font-semibold text-ink-900">
-              <Icon name="qr" className="h-4 w-4 text-brand-600" />
-              Scan to check in
-            </h2>
-            <p className="mt-1 text-sm text-ink-500">
-              Show this on a screen at the door. It changes every 30 seconds, so a screenshot
-              won&apos;t work later.
+          <section className="card h-fit p-6 text-center lg:sticky lg:top-28">
+            <Sprig className="mx-auto h-5 w-5 text-sage-500" />
+            <h2 className="mt-3 font-serif text-lg text-bark-700">Scan to check in</h2>
+            <p className="mt-2 text-sm leading-relaxed text-bark-500">
+              Put this on a screen at the door. It changes every thirty seconds, so a photo of it
+              is no use later.
             </p>
 
-            <div className="mt-4 flex aspect-square items-center justify-center rounded-xl border border-ink-200 bg-white p-3">
+            <div className="mt-5 flex aspect-square items-center justify-center rounded-field border border-bark-200 bg-paper p-3">
               {qrError ? (
-                <p className="px-4 text-sm text-rose-700">{qrError}</p>
+                <p className="px-4 text-sm text-terra-700">{qrError}</p>
               ) : qr ? (
-                <img src={qr.qrDataUrl} alt="Check-in QR code" className="h-full w-full object-contain" />
+                <img
+                  src={qr.qrDataUrl}
+                  alt="Check-in QR code"
+                  className="h-full w-full object-contain"
+                />
               ) : (
-                <Spinner className="h-7 w-7 text-brand-600" />
+                <Spinner className="h-7 w-7 text-sage-600" />
               )}
             </div>
 
-            <div className="mt-4 rounded-xl border border-ink-200 bg-ink-50/70 px-4 py-3">
-              <p className="text-xs font-semibold uppercase tracking-wide text-ink-400">
-                Or read out this code
-              </p>
-              <p className="mt-1 font-mono text-3xl font-bold tracking-[0.3em] text-ink-900">
+            <div className="panel mt-5 px-4 py-4">
+              <p className="eyebrow">Or read this out</p>
+              <p className="mt-2 font-serif text-3xl tracking-[0.25em] text-bark-700">
                 {qr?.code || '······'}
               </p>
-              <p className="mt-1 text-xs text-ink-500">
-                For anyone who can&apos;t scan — they enter it under Check in.
+              <p className="mt-2 text-xs leading-relaxed text-bark-500">
+                For anyone who can&apos;t scan — they type it in under Check in.
               </p>
             </div>
 
-            <p className="mt-3 text-xs text-ink-400">
-              Volunteers must have joined the event before they can check in.
+            <p className="mt-4 text-xs leading-relaxed text-bark-400">
+              People need to have claimed a place before they can check in.
             </p>
           </section>
         )}
@@ -249,11 +271,13 @@ export default function ManageEvent() {
         {/* -------------------------------------------------------- roster */}
         <section className={completed ? 'lg:col-span-2' : ''}>
           <div className="card overflow-hidden">
-            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-ink-200/70 px-5 py-4">
+            <div className="flex flex-wrap items-center justify-between gap-4 border-b border-bark-200/70 px-5 py-4">
               <div>
-                <h2 className="text-base font-semibold text-ink-900">Attendance</h2>
-                <p className="mt-0.5 text-sm text-ink-500">
-                  {completed ? 'Final roster.' : 'Tick anyone who signs in at the door by hand.'}
+                <h2 className="font-serif text-lg text-bark-700">Who&apos;s here</h2>
+                <p className="mt-0.5 text-sm text-bark-500">
+                  {completed
+                    ? 'The final register.'
+                    : 'Tick anyone who signs in at the door by hand.'}
                 </p>
               </div>
               {!completed && (
@@ -270,21 +294,29 @@ export default function ManageEvent() {
             </div>
 
             {roster.length === 0 ? (
-              <p className="px-5 py-12 text-center text-sm text-ink-500">
-                Nobody has joined this event yet.
-              </p>
+              <div className="flex flex-col items-center gap-3 px-5 py-16 text-center">
+                <Sprig className="h-7 w-7 text-sage-400" />
+                <p className="font-serif text-lg text-bark-700">Nobody has joined yet</p>
+                <p className="max-w-xs text-sm leading-relaxed text-bark-500">
+                  Names will appear here as people claim a place.
+                </p>
+              </div>
             ) : (
-              <ul className="divide-y divide-ink-200/70">
+              <ul className="divide-y divide-bark-200/70">
                 {roster.map((row) => (
-                  <li key={row.volunteerId} className="flex items-center gap-3 px-5 py-3">
+                  <li
+                    key={row.volunteerId}
+                    className="flex flex-wrap items-center gap-x-3 gap-y-2 px-5 py-3.5"
+                  >
+                    <Avatar name={row.name} className="h-9 w-9" />
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-semibold text-ink-900">{row.name}</p>
-                      <p className="truncate text-xs text-ink-500">{row.email}</p>
+                      <p className="truncate text-sm text-bark-800">{row.name}</p>
+                      <p className="truncate text-xs text-bark-500">{row.email}</p>
                     </div>
 
                     {row.present && (
-                      <Badge tone={row.method === 'qr' ? 'brand' : 'ocean'} icon="check">
-                        {row.method === 'qr' ? 'Scanned' : 'Manual'}
+                      <Badge tone={row.method === 'qr' ? 'sage' : 'oat'} icon="check">
+                        {row.method === 'qr' ? 'Scanned in' : 'Ticked off'}
                       </Badge>
                     )}
 
@@ -293,7 +325,7 @@ export default function ManageEvent() {
                         type="button"
                         onClick={() => toggle(row)}
                         disabled={savingId === row.volunteerId}
-                        className={row.present ? 'btn-outline btn-sm' : 'btn-secondary btn-sm'}
+                        className={row.present ? 'btn-ghost btn-sm' : 'btn-outline btn-sm'}
                       >
                         {savingId === row.volunteerId ? (
                           <Spinner className="h-3.5 w-3.5" />
@@ -310,34 +342,39 @@ export default function ManageEvent() {
             )}
           </div>
 
-          {/* ---------------------------------------------------- gig table */}
+          {/* ------------------------------------------------ what you owe */}
           {completed && gigs && gigs.length > 0 && (
-            <div className="card mt-6 overflow-hidden">
-              <div className="border-b border-ink-200/70 px-5 py-4">
-                <h2 className="text-base font-semibold text-ink-900">Gigs to settle</h2>
-                <p className="mt-0.5 text-sm text-ink-500">
-                  Mark each one once you&apos;ve paid or handed it over. VolunteerConnect only keeps
-                  the record.
+            <div className="card mt-8 overflow-hidden">
+              <div className="border-b border-bark-200/70 px-5 py-4">
+                <h2 className="font-serif text-lg text-bark-700">Still to hand over</h2>
+                <p className="mt-0.5 text-sm leading-relaxed text-bark-500">
+                  Tick each one off once you have paid or handed it over. HelpHop only keeps the
+                  record.
                 </p>
               </div>
-              <ul className="divide-y divide-ink-200/70">
+              <ul className="divide-y divide-bark-200/70">
                 {gigs.map((g) => (
-                  <li key={g.id} className="flex flex-wrap items-center gap-3 px-5 py-3">
+                  <li key={g.id} className="flex flex-wrap items-center gap-x-3 gap-y-2 px-5 py-3.5">
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-semibold text-ink-900">{g.volunteer.name}</p>
-                      <p className="truncate text-xs text-ink-500">{g.volunteer.email}</p>
+                      <p className="truncate text-sm text-bark-800">{g.volunteer.name}</p>
+                      <p className="truncate text-xs text-bark-500">{g.volunteer.email}</p>
                     </div>
-                    <span className="text-sm font-semibold text-ink-700">
-                      {gigLabel({ mode: g.mode, amount: g.amount, currency: g.currency, perkTitle: g.perkTitle })}
+                    <span className="text-sm text-bark-700">
+                      {gigLabel({
+                        mode: g.mode,
+                        amount: g.amount,
+                        currency: g.currency,
+                        perkTitle: g.perkTitle,
+                      })}
                     </span>
-                    <Badge tone={g.status === 'settled' ? 'brand' : 'amber'}>
-                      {g.status === 'settled' ? 'Settled' : 'Pending'}
+                    <Badge tone={g.status === 'settled' ? 'sage' : 'oat'}>
+                      {g.status === 'settled' ? 'Settled' : 'Outstanding'}
                     </Badge>
                     <button
                       type="button"
                       onClick={() => settle(g)}
                       disabled={savingId === g.id}
-                      className={g.status === 'settled' ? 'btn-outline btn-sm' : 'btn-secondary btn-sm'}
+                      className={g.status === 'settled' ? 'btn-ghost btn-sm' : 'btn-outline btn-sm'}
                     >
                       {savingId === g.id ? (
                         <Spinner className="h-3.5 w-3.5" />
@@ -361,35 +398,40 @@ export default function ManageEvent() {
           subtitle="This is the step that issues everything."
           onClose={() => !completing && setConfirming(false)}
         >
-          <div className="space-y-4 text-sm text-ink-600">
+          <div className="space-y-5 text-sm leading-relaxed text-bark-600">
             <p>
-              <strong className="text-ink-900">{counts.present}</strong> of {counts.registered}{' '}
-              volunteers are marked present. They will each receive:
+              <span className="font-serif text-xl text-bark-800">{counts.present}</span> of{' '}
+              {counts.registered} volunteers are marked present. Each of them will receive:
             </p>
-            <ul className="space-y-2">
-              <li className="flex items-center gap-2">
-                <Icon name="certificate" className="h-4 w-4 text-brand-600" />
+            <ul className="space-y-2.5">
+              <li className="flex items-center gap-2.5">
+                <Icon name="certificate" className="h-4 w-4 text-sage-600" />
                 A certificate of participation
               </li>
               {gig && (
-                <li className="flex items-center gap-2">
+                <li className="flex items-center gap-2.5">
                   <Icon
                     name={opportunity.gig.mode === 'paid' ? 'wallet' : 'gift'}
-                    className="h-4 w-4 text-brand-600"
+                    className="h-4 w-4 text-sage-600"
                   />
                   {gig}
                 </li>
               )}
             </ul>
             <Alert type="warning">
-              Attendance locks afterwards and the event can no longer be edited. Volunteers not
-              marked present receive nothing.
+              Attendance locks afterwards and the event can no longer be edited. Anyone not marked
+              present receives nothing.
             </Alert>
           </div>
 
-          <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-            <button type="button" className="btn-outline" onClick={() => setConfirming(false)} disabled={completing}>
-              Cancel
+          <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+            <button
+              type="button"
+              className="btn-ghost"
+              onClick={() => setConfirming(false)}
+              disabled={completing}
+            >
+              Not yet
             </button>
             <button type="button" className="btn-primary" onClick={complete} disabled={completing}>
               {completing && <Spinner className="h-4 w-4" />}

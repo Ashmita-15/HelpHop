@@ -31,9 +31,9 @@ export const emptyOpportunity = {
 };
 
 const GIG_MODES = [
-  { value: 'none', label: 'Nothing', hint: 'Volunteers take part for the cause alone' },
-  { value: 'paid', label: 'Payment', hint: 'A fixed amount per volunteer' },
-  { value: 'perk', label: 'Reward', hint: 'A voucher, kit, meal or other perk' },
+  { value: 'none', label: 'Nothing', hint: 'People come for the cause alone' },
+  { value: 'paid', label: 'A payment', hint: 'A fixed amount for each volunteer' },
+  { value: 'perk', label: 'A thank-you', hint: 'Lunch, travel costs, a voucher' },
 ];
 
 /** Flattens the API's nested gig object into the flat shape this form edits. */
@@ -49,7 +49,7 @@ export const gigToForm = (gig) => ({
 export const toDateInput = (value) => (value ? new Date(value).toISOString().slice(0, 10) : '');
 
 /**
- * Shared create/edit form, including the AI description generator.
+ * Shared create/edit form, including the description generator.
  * `onSubmit` receives the cleaned payload and may throw to surface an error.
  */
 export default function OpportunityForm({
@@ -84,8 +84,8 @@ export default function OpportunityForm({
       setForm((f) => ({ ...f, description: res.description }));
       setAiNote(
         res.source === 'gemini'
-          ? 'Draft written by Gemini — edit it to sound like you.'
-          : res.note || 'Draft from the built-in template — edit it to sound like you.'
+          ? 'Here is a first draft. Edit it until it sounds like you.'
+          : res.note || 'A draft from the built-in template. Edit it until it sounds like you.'
       );
     } catch (err) {
       setError(err.message);
@@ -108,7 +108,7 @@ export default function OpportunityForm({
       gig = { mode: 'paid', amount, currency: (form.gigCurrency || 'INR').toUpperCase() };
     } else if (form.gigMode === 'perk') {
       if (!form.perkTitle.trim()) {
-        setError('Give the reward a name, e.g. "Lunch + ₹200 travel voucher".');
+        setError('Give the thank-you a name, for example “Lunch and ₹200 towards travel”.');
         return;
       }
       gig = {
@@ -136,7 +136,7 @@ export default function OpportunityForm({
       return;
     }
     if (payload.startTime && payload.endTime && payload.endTime <= payload.startTime) {
-      setError('End time must be after the start time.');
+      setError('The end time needs to be after the start time.');
       return;
     }
 
@@ -151,7 +151,7 @@ export default function OpportunityForm({
       return;
     }
     if (!Number.isInteger(payload.requiredVolunteers) || payload.requiredVolunteers < 1) {
-      setError('Number of volunteers must be a whole number of at least 1.');
+      setError('The number of volunteers needs to be a whole number, at least 1.');
       return;
     }
 
@@ -165,212 +165,209 @@ export default function OpportunityForm({
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6" noValidate>
+    <form onSubmit={handleSubmit} className="space-y-14" noValidate>
       {error && (
         <Alert type="error" onDismiss={() => setError('')}>
           {error}
         </Alert>
       )}
 
-      {/* ---------------------------------------------------------- basics */}
-      <section className="card p-5 sm:p-6">
-        <h2 className="text-base font-semibold text-ink-900">When and where</h2>
-        <p className="mt-1 text-sm text-ink-500">
-          This is what volunteers see on the card before they click through.
-        </p>
+      {/* ------------------------------------------------------- the basics */}
+      <Fieldset
+        step="01"
+        legend="When and where"
+        note="This is what people see on the card before they click through."
+      >
+        <div>
+          <label className="label" htmlFor="title">
+            What is it called?
+          </label>
+          <input
+            id="title"
+            className="input"
+            placeholder="Saturday morning at the allotment"
+            value={form.title}
+            onChange={set('title')}
+            maxLength={120}
+            required
+          />
+        </div>
 
-        <div className="mt-5 space-y-5">
+        <div className="grid gap-6 sm:grid-cols-2">
           <div>
-            <label className="label" htmlFor="title">
-              Title
+            <label className="label" htmlFor="category">
+              Cause
+            </label>
+            <select
+              id="category"
+              className="input"
+              value={form.category}
+              onChange={set('category')}
+              required
+            >
+              <option value="">Choose a cause…</option>
+              {CATEGORIES.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="label" htmlFor="location">
+              Town or area
             </label>
             <input
-              id="title"
+              id="location"
               className="input"
-              placeholder="e.g. Saturday morning beach clean-up"
-              value={form.title}
-              onChange={set('title')}
-              maxLength={120}
+              placeholder="Bandra West, Mumbai"
+              value={form.location}
+              onChange={set('location')}
+              required
+            />
+            <p className="hint mt-2">This is what people search by.</p>
+          </div>
+
+          <div className="sm:col-span-2">
+            <label className="label" htmlFor="venue">
+              Exact meeting point <span className="normal-case tracking-normal text-bark-400">(optional)</span>
+            </label>
+            <input
+              id="venue"
+              className="input"
+              placeholder="Gate 3, Riverside Park — look for the green gazebo"
+              maxLength={200}
+              value={form.venue}
+              onChange={set('venue')}
+            />
+            <p className="hint mt-2">Where to go once they arrive, and who to look for.</p>
+          </div>
+
+          <div>
+            <label className="label" htmlFor="date">
+              Date
+            </label>
+            <input
+              id="date"
+              type="date"
+              className="input"
+              value={form.date}
+              onChange={set('date')}
               required
             />
           </div>
 
-          <div className="grid gap-5 sm:grid-cols-2">
+          <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="label" htmlFor="category">
-                Category
-              </label>
-              <select
-                id="category"
-                className="input"
-                value={form.category}
-                onChange={set('category')}
-                required
-              >
-                <option value="">Choose a category…</option>
-                {CATEGORIES.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="label" htmlFor="location">
-                Location
+              <label className="label" htmlFor="startTime">
+                Starts
               </label>
               <input
-                id="location"
+                id="startTime"
+                type="time"
                 className="input"
-                placeholder="e.g. Portland, OR"
-                value={form.location}
-                onChange={set('location')}
-                required
+                value={form.startTime}
+                onChange={set('startTime')}
               />
-              <p className="hint mt-1.5">The city or area volunteers search by.</p>
             </div>
-
-            <div className="sm:col-span-2">
-              <label className="label" htmlFor="venue">
-                Venue <span className="font-normal text-ink-400">(optional)</span>
-              </label>
-              <input
-                id="venue"
-                className="input"
-                placeholder="Gate 3, Riverside Park"
-                maxLength={200}
-                value={form.venue}
-                onChange={set('venue')}
-              />
-              <p className="hint mt-1.5">Exactly where to meet once they arrive.</p>
-            </div>
-
             <div>
-              <label className="label" htmlFor="date">
-                Date
+              <label className="label" htmlFor="endTime">
+                Ends
               </label>
               <input
-                id="date"
-                type="date"
+                id="endTime"
+                type="time"
                 className="input"
-                value={form.date}
-                onChange={set('date')}
-                required
+                value={form.endTime}
+                onChange={set('endTime')}
+                disabled={!form.startTime}
+                title={form.startTime ? undefined : 'Set a start time first'}
               />
             </div>
+          </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="label" htmlFor="startTime">
-                  Starts <span className="font-normal text-ink-400">(optional)</span>
-                </label>
-                <input
-                  id="startTime"
-                  type="time"
-                  className="input"
-                  value={form.startTime}
-                  onChange={set('startTime')}
-                />
-              </div>
-              <div>
-                <label className="label" htmlFor="endTime">
-                  Ends <span className="font-normal text-ink-400">(optional)</span>
-                </label>
-                <input
-                  id="endTime"
-                  type="time"
-                  className="input"
-                  value={form.endTime}
-                  onChange={set('endTime')}
-                  disabled={!form.startTime}
-                  title={form.startTime ? undefined : 'Set a start time first'}
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="label" htmlFor="requiredVolunteers">
-                Volunteers needed
-              </label>
-              <input
-                id="requiredVolunteers"
-                type="number"
-                min="1"
-                max="10000"
-                className="input"
-                value={form.requiredVolunteers}
-                onChange={set('requiredVolunteers')}
-                required
-              />
-              <p className="hint mt-1.5">Sign-ups stop automatically once this many join.</p>
-            </div>
+          <div>
+            <label className="label" htmlFor="requiredVolunteers">
+              How many people do you need?
+            </label>
+            <input
+              id="requiredVolunteers"
+              type="number"
+              min="1"
+              max="10000"
+              className="input"
+              value={form.requiredVolunteers}
+              onChange={set('requiredVolunteers')}
+              required
+            />
+            <p className="hint mt-2">Sign-ups close on their own once this many have joined.</p>
           </div>
         </div>
-      </section>
+      </Fieldset>
 
-      {/* ----------------------------------------------------- description */}
-      <section className="card p-5 sm:p-6">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h2 className="text-base font-semibold text-ink-900">Description</h2>
-            <p className="mt-1 text-sm text-ink-500">
-              What volunteers will actually do, and what to bring.
-            </p>
-          </div>
-
+      {/* ------------------------------------------------------ description */}
+      <Fieldset
+        step="02"
+        legend="What it actually involves"
+        note="Be specific. People decide on this paragraph more than anything else."
+        action={
           <button
             type="button"
             onClick={handleGenerate}
             disabled={!canGenerate || generating}
-            className="btn-secondary btn-sm"
+            className="btn-outline btn-sm"
             title={
               canGenerate
-                ? 'Draft a description from the details above'
-                : 'Add a title, category and location first'
+                ? 'Draft something from the details above'
+                : 'Add a title, cause and town first'
             }
           >
-            {generating ? <Spinner className="h-3.5 w-3.5" /> : <Icon name="sparkle" className="h-3.5 w-3.5" />}
-            {generating ? 'Generating…' : 'Generate description'}
+            {generating ? (
+              <Spinner className="h-3.5 w-3.5" />
+            ) : (
+              <Icon name="sparkle" className="h-3.5 w-3.5" />
+            )}
+            {generating ? 'Writing…' : 'Draft it for me'}
           </button>
-        </div>
-
-        <textarea
-          id="description"
-          rows={9}
-          className="input mt-5 resize-y leading-relaxed"
-          placeholder="Describe the shift: what volunteers will be doing, what to wear or bring, and who to look for when they arrive…"
-          value={form.description}
-          onChange={set('description')}
-          maxLength={4000}
-          required
-        />
-
-        <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-          <p className="hint">
-            {!canGenerate && 'Fill in title, category and location to enable the generator.'}
-          </p>
-          <p className="hint tabular-nums">{form.description.length}/4000</p>
+        }
+      >
+        <div>
+          <label className="sr-only" htmlFor="description">
+            Description
+          </label>
+          <textarea
+            id="description"
+            rows={10}
+            className="input resize-y leading-[1.8]"
+            placeholder="What volunteers will be doing, what to wear or bring, and who to look for when they arrive…"
+            value={form.description}
+            onChange={set('description')}
+            maxLength={4000}
+            required
+          />
+          <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+            <p className="hint">
+              {!canGenerate && 'Fill in the title, cause and town to use the drafting button.'}
+            </p>
+            <p className="hint tabular-nums">{form.description.length}/4000</p>
+          </div>
         </div>
 
         {aiNote && (
-          <div className="mt-3">
-            <Alert type="info" onDismiss={() => setAiNote('')}>
-              {aiNote}
-            </Alert>
-          </div>
+          <Alert type="info" onDismiss={() => setAiNote('')}>
+            {aiNote}
+          </Alert>
         )}
-      </section>
+      </Fieldset>
 
-      {/* ------------------------------------------------------------- gig */}
-      <section className="card p-5 sm:p-6">
-        <h2 className="text-base font-semibold text-ink-900">What volunteers get</h2>
-        <p className="mt-1 text-sm text-ink-500">
-          Issued automatically to everyone marked present when you complete the event. Everyone who
-          attends receives a certificate either way.
-        </p>
-
-        <fieldset className="mt-5">
+      {/* -------------------------------------------------------- thank-you */}
+      <Fieldset
+        step="03"
+        legend="What volunteers get"
+        note="Everyone marked present receives a certificate. Anything else you offer is recorded here and settled by you directly."
+      >
+        <fieldset>
           <legend className="sr-only">Reward type</legend>
           <div className="grid gap-3 sm:grid-cols-3">
             {GIG_MODES.map((mode) => {
@@ -378,10 +375,10 @@ export default function OpportunityForm({
               return (
                 <label
                   key={mode.value}
-                  className={`cursor-pointer rounded-xl border p-4 transition ${
+                  className={`cursor-pointer rounded-card border p-4 transition-all duration-200 ease-natural ${
                     active
-                      ? 'border-brand-500 bg-brand-50/60 ring-1 ring-brand-500'
-                      : 'border-ink-200 hover:border-ink-300 hover:bg-ink-50/60'
+                      ? 'border-sage-500 bg-sage-50'
+                      : 'border-bark-200 bg-paper hover:border-bark-300'
                   }`}
                 >
                   <input
@@ -392,16 +389,18 @@ export default function OpportunityForm({
                     onChange={set('gigMode')}
                     className="sr-only"
                   />
-                  <span className="flex items-center gap-2 text-sm font-semibold text-ink-900">
+                  <span className="flex items-center gap-2 font-serif text-base text-bark-700">
                     {mode.value !== 'none' && (
                       <Icon
                         name={mode.value === 'paid' ? 'wallet' : 'gift'}
-                        className={`h-4 w-4 ${active ? 'text-brand-600' : 'text-ink-400'}`}
+                        className={`h-4 w-4 ${active ? 'text-sage-600' : 'text-bark-400'}`}
                       />
                     )}
                     {mode.label}
                   </span>
-                  <span className="mt-1 block text-xs leading-relaxed text-ink-500">{mode.hint}</span>
+                  <span className="mt-1.5 block text-xs leading-relaxed text-bark-500">
+                    {mode.hint}
+                  </span>
                 </label>
               );
             })}
@@ -409,10 +408,10 @@ export default function OpportunityForm({
         </fieldset>
 
         {form.gigMode === 'paid' && (
-          <div className="mt-5 grid gap-5 sm:grid-cols-[1fr_8rem]">
+          <div className="grid gap-6 sm:grid-cols-[1fr_9rem]">
             <div>
               <label className="label" htmlFor="gigAmount">
-                Amount per volunteer
+                Amount for each volunteer
               </label>
               <input
                 id="gigAmount"
@@ -438,22 +437,22 @@ export default function OpportunityForm({
               />
             </div>
             <p className="hint sm:col-span-2">
-              VolunteerConnect records what you owe and tracks it as paid — it never handles the
-              money itself. You pay volunteers your usual way.
+              HelpHop records what you owe and marks it off when you say it is settled. The money
+              never passes through us — you pay people your usual way.
             </p>
           </div>
         )}
 
         {form.gigMode === 'perk' && (
-          <div className="mt-5 space-y-5">
+          <div className="space-y-6">
             <div>
               <label className="label" htmlFor="perkTitle">
-                Reward
+                What are you offering?
               </label>
               <input
                 id="perkTitle"
                 className="input"
-                placeholder="e.g. Lunch + ₹200 travel voucher"
+                placeholder="Lunch and ₹200 towards travel"
                 maxLength={120}
                 value={form.perkTitle}
                 onChange={set('perkTitle')}
@@ -461,13 +460,13 @@ export default function OpportunityForm({
             </div>
             <div>
               <label className="label" htmlFor="perkDescription">
-                Details <span className="font-normal text-ink-400">(optional)</span>
+                Any details <span className="normal-case tracking-normal text-bark-400">(optional)</span>
               </label>
               <textarea
                 id="perkDescription"
                 rows={3}
                 className="input resize-y"
-                placeholder="How volunteers claim it, when it's handed over, anything they should bring…"
+                placeholder="How people claim it, when it is handed over, anything they should bring…"
                 maxLength={1000}
                 value={form.perkDescription}
                 onChange={set('perkDescription')}
@@ -475,12 +474,12 @@ export default function OpportunityForm({
             </div>
           </div>
         )}
-      </section>
+      </Fieldset>
 
-      {/* --------------------------------------------------------- actions */}
-      <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+      {/* ---------------------------------------------------------- actions */}
+      <div className="flex flex-col-reverse gap-3 border-t border-bark-200/70 pt-8 sm:flex-row sm:justify-end">
         {onCancel && (
-          <button type="button" className="btn-outline" onClick={onCancel} disabled={saving}>
+          <button type="button" className="btn-ghost" onClick={onCancel} disabled={saving}>
             Cancel
           </button>
         )}
@@ -490,5 +489,27 @@ export default function OpportunityForm({
         </button>
       </div>
     </form>
+  );
+}
+
+/**
+ * One numbered section of the form. The step numeral and the ruled heading are
+ * what keep a long form feeling like a page rather than a settings screen.
+ */
+function Fieldset({ step, legend, note, action, children }) {
+  return (
+    <section>
+      <div className="flex flex-wrap items-start justify-between gap-4 border-b border-bark-200/70 pb-5">
+        <div className="flex gap-5">
+          <span className="font-serif text-xl italic text-sage-500">{step}</span>
+          <div>
+            <h2 className="font-serif text-xl text-bark-700">{legend}</h2>
+            {note && <p className="mt-1.5 max-w-prose text-sm leading-relaxed text-bark-500">{note}</p>}
+          </div>
+        </div>
+        {action}
+      </div>
+      <div className="mt-7 space-y-6">{children}</div>
+    </section>
   );
 }

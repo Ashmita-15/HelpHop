@@ -2,11 +2,12 @@ import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 
 import { api } from '../api/client.js';
+import { Sprig, Wave } from '../components/Ornament.jsx';
 import { Icon, Loading, formatDate, formatDateTime } from '../components/ui.jsx';
 
 /**
- * Public page behind the QR printed on every certificate. No login: anyone
- * handed a certificate must be able to confirm it in one scan.
+ * The public page behind the QR printed on every certificate. No login:
+ * anyone handed a certificate has to be able to confirm it in one scan.
  */
 export default function VerifyCertificate() {
   const { code } = useParams();
@@ -21,77 +22,84 @@ export default function VerifyCertificate() {
       .finally(() => setLoading(false));
   }, [code]);
 
-  if (loading) return <Loading label="Checking certificate…" />;
+  if (loading) return <Loading label="Checking the record…" />;
 
   const valid = result?.valid;
 
+  const rows = valid
+    ? [
+        ['Volunteer', result.volunteerName],
+        ['Event', result.eventTitle],
+        ['Organisation', result.orgName],
+        ['Where', result.eventLocation],
+        ['Date of the event', result.eventDate && formatDate(result.eventDate)],
+        ['Issued', result.issuedAt && formatDateTime(result.issuedAt)],
+        ['Certificate ID', result.code],
+      ].filter(([, value]) => value)
+    : [];
+
   return (
-    <div className="shell-narrow py-16">
-      <div className="card mx-auto max-w-lg overflow-hidden">
+    <div className="shell-narrow py-16 sm:py-20">
+      <div className="card mx-auto max-w-xl overflow-hidden">
+        {/* The header is set like the head of a printed certificate. */}
         <div
-          className={`flex items-center gap-3 px-6 py-5 ${
-            valid ? 'bg-brand-50 text-brand-800' : 'bg-rose-50 text-rose-800'
-          }`}
+          className={`px-8 py-10 text-center ${valid ? 'bg-sage-50' : 'bg-terra-50'}`}
         >
           <span
-            className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
-              valid ? 'bg-brand-600 text-white' : 'bg-rose-600 text-white'
+            className={`mx-auto flex h-12 w-12 items-center justify-center rounded-full ${
+              valid ? 'bg-sage-600 text-paper' : 'bg-terra-600 text-paper'
             }`}
           >
             <Icon name={valid ? 'shield' : 'close'} className="h-5 w-5" />
           </span>
-          <div>
-            <h1 className="text-lg font-bold tracking-tight">
-              {valid ? 'Genuine certificate' : 'Not a valid certificate'}
-            </h1>
-            <p className="text-sm opacity-80">
-              {valid
-                ? 'Issued through VolunteerConnect.'
-                : 'No certificate matches this code.'}
-            </p>
-          </div>
+          <h1
+            className={`mt-5 font-serif text-2xl ${valid ? 'text-sage-900' : 'text-terra-800'}`}
+          >
+            {valid ? 'This certificate is genuine' : 'We don’t recognise this certificate'}
+          </h1>
+          <p className={`mt-2 text-sm ${valid ? 'text-sage-800' : 'text-terra-700'}`}>
+            {valid
+              ? 'Issued through HelpHop, and recorded against the event below.'
+              : 'Nothing in our records matches that code.'}
+          </p>
+          {valid && <Wave className="mx-auto mt-6 h-4 w-20 text-sage-300" />}
         </div>
 
         {valid ? (
-          <dl className="divide-y divide-ink-200/70">
-            {[
-              ['Volunteer', result.volunteerName],
-              ['Event', result.eventTitle],
-              ['Organization', result.orgName],
-              ['Location', result.eventLocation],
-              ['Event date', result.eventDate && formatDate(result.eventDate)],
-              ['Issued', result.issuedAt && formatDateTime(result.issuedAt)],
-              ['Certificate ID', result.code],
-            ]
-              .filter(([, value]) => value)
-              .map(([label, value]) => (
-                <div key={label} className="flex flex-wrap items-baseline gap-x-4 gap-y-1 px-6 py-3.5">
-                  <dt className="w-32 shrink-0 text-xs font-semibold uppercase tracking-wide text-ink-400">
-                    {label}
-                  </dt>
-                  <dd
-                    className={`min-w-0 flex-1 text-sm font-medium text-ink-900 ${
-                      label === 'Certificate ID' ? 'font-mono tracking-wide' : ''
-                    }`}
-                  >
-                    {value}
-                  </dd>
-                </div>
-              ))}
+          <dl className="divide-y divide-bark-200/70">
+            {rows.map(([label, value]) => (
+              <div
+                key={label}
+                className="flex flex-wrap items-baseline gap-x-6 gap-y-1 px-8 py-4"
+              >
+                <dt className="w-36 shrink-0 text-[0.68rem] uppercase tracking-[0.16em] text-bark-400">
+                  {label}
+                </dt>
+                <dd
+                  className={`min-w-0 flex-1 text-sm text-bark-800 ${
+                    label === 'Certificate ID' ? 'font-mono tracking-wide' : ''
+                  }`}
+                >
+                  {value}
+                </dd>
+              </div>
+            ))}
           </dl>
         ) : (
-          <div className="px-6 py-8 text-sm leading-relaxed text-ink-500">
-            <p>
-              The code <span className="font-mono font-semibold text-ink-700">{code}</span> is not in
-              our records. Check for typos — certificate IDs never contain the letters I, L, O or U.
+          <div className="flex flex-col items-center gap-4 px-8 py-12 text-center">
+            <Sprig className="h-7 w-7 text-oat-500" />
+            <p className="max-w-sm text-sm leading-[1.8] text-bark-500">
+              The code <span className="font-mono text-bark-700">{code}</span> isn’t in our
+              records. Worth checking for typos — certificate IDs never contain the letters I, L,
+              O or U.
             </p>
           </div>
         )}
 
-        <div className="border-t border-ink-200/70 px-6 py-4">
-          <Link to="/" className="btn-outline btn-sm">
+        <div className="border-t border-bark-200/70 bg-oat-50 px-8 py-5">
+          <Link to="/" className="btn-ghost btn-sm">
             <Icon name="arrowLeft" className="h-3.5 w-3.5" />
-            Go to VolunteerConnect
+            Go to HelpHop
           </Link>
         </div>
       </div>

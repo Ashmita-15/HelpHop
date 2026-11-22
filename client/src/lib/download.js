@@ -10,4 +10,4 @@ export function saveBlob(blob, filename) {
   URL.revokeObjectURL(url);
 }
 
-export const certificateFilename = (code) => `volunteerconnect-certificate-${code}.pdf`;
+export const certificateFilename = (code) => `helphop-certificate-${code}.pdf`;

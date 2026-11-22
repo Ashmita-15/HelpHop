@@ -1,55 +1,57 @@
 import { Link } from 'react-router-dom';
 import Logo from './Logo.jsx';
+import { Wave } from './Ornament.jsx';
 
 const COLUMNS = [
   {
-    title: 'Volunteers',
+    title: 'For volunteers',
     links: [
-      { label: 'Browse opportunities', to: '/opportunities' },
-      { label: 'How it works', to: '/#how-it-works' },
+      { label: 'Find an opportunity', to: '/opportunities' },
+      { label: 'How HelpHop works', to: '/about#how-it-works' },
       { label: 'Create an account', to: '/register' },
     ],
   },
   {
-    title: 'Organizations',
+    title: 'For organisations',
     links: [
-      { label: 'Post an opportunity', to: '/register' },
-      { label: 'Manage sign-ups', to: '/login' },
-      { label: 'Why VolunteerConnect', to: '/#impact' },
+      { label: 'Join us', to: '/register' },
+      { label: 'Manage your sign-ups', to: '/login' },
+      { label: 'What we believe', to: '/about#beliefs' },
     ],
   },
 ];
 
 export default function Footer() {
   return (
-    <footer className="mt-auto border-t border-ink-200/70 bg-ink-50/60">
-      <div className="shell py-12">
-        <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-4">
-          <div className="lg:col-span-2">
+    <footer className="mt-auto border-t border-bark-200/70 bg-oat-50">
+      <div className="shell py-16">
+        <div className="grid gap-12 md:grid-cols-[1.4fr_1fr_1fr]">
+          <div>
             <Logo />
-            <p className="mt-3 max-w-sm text-sm leading-relaxed text-ink-500">
-              A noticeboard for local volunteering. Organizations post the shifts they need
-              filled, and neighbours claim the ones that fit their week.
+            <p className="mt-5 max-w-sm text-sm leading-[1.8] text-bark-500">
+              HelpHop is a noticeboard for neighbourhood volunteering. Local organisations post
+              what they need; people nearby put their hand up. Nothing more complicated than that.
             </p>
+            <Wave className="mt-6 h-4 w-20 text-oat-500" />
           </div>
 
           {COLUMNS.map((col) => (
             <div key={col.title}>
-              <h3 className="text-sm font-semibold text-ink-900">{col.title}</h3>
-              <ul className="mt-3 space-y-2.5">
+              <h3 className="font-serif text-base text-bark-700">{col.title}</h3>
+              <ul className="mt-4 space-y-3">
                 {col.links.map((l) => (
                   <li key={l.label}>
                     {l.to.includes('#') ? (
                       <a
                         href={l.to}
-                        className="text-sm text-ink-500 transition-colors hover:text-brand-700"
+                        className="text-sm text-bark-500 transition-colors hover:text-sage-700"
                       >
                         {l.label}
                       </a>
                     ) : (
                       <Link
                         to={l.to}
-                        className="text-sm text-ink-500 transition-colors hover:text-brand-700"
+                        className="text-sm text-bark-500 transition-colors hover:text-sage-700"
                       >
                         {l.label}
                       </Link>
@@ -61,11 +63,13 @@ export default function Footer() {
           ))}
         </div>
 
-        <div className="divider mt-10 flex flex-col gap-2 pt-6 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-xs text-ink-400">
-            © {new Date().getFullYear()} VolunteerConnect. Built for local community groups.
+        <div className="rule mt-14 flex flex-col gap-3 pt-7 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-xs text-bark-400">
+            © {new Date().getFullYear()} HelpHop. Made for and by local community groups.
           </p>
-          <p className="text-xs text-ink-400">Made with care, not venture capital.</p>
+          <p className="font-serif text-xs italic text-bark-400">
+            A little help can go a long way.
+          </p>
         </div>
       </div>
     </footer>

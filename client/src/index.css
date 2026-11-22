@@ -2,114 +2,258 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ==========================================================================
+   HelpHop design tokens
+   --------------------------------------------------------------------------
+   Channel triplets so Tailwind's /opacity modifiers work against them.
+   Nothing in the app should hardcode a colour — reach for a token or the
+   Tailwind name that maps to it (see tailwind.config.js).
+   ========================================================================== */
+
+:root {
+  /* Grounds */
+  --linen: 246 240 230; /* #F6F0E6 — page */
+  --paper: 255 252 247; /* #FFFCF7 — cards, elevated surfaces */
+
+  /* Sage — brand + primary action */
+  --sage-50: 242 244 241;
+  --sage-100: 227 232 225;
+  --sage-200: 201 210 198;
+  --sage-300: 168 182 164;
+  --sage-400: 139 156 133;
+  --sage-500: 113 131 107; /* #71836B */
+  --sage-600: 92 108 87;
+  --sage-700: 74 87 70;
+  --sage-800: 59 69 56;
+  --sage-900: 46 53 44;
+
+  /* Terracotta — occasional accent */
+  --terra-50: 251 242 238;
+  --terra-100: 244 224 215;
+  --terra-200: 232 194 178;
+  --terra-300: 215 158 134;
+  --terra-400: 200 130 106;
+  --terra-500: 185 103 78; /* #B9674E */
+  --terra-600: 158 84 64;
+  --terra-700: 129 67 52;
+  --terra-800: 101 54 43;
+
+  /* Oat — secondary surfaces */
+  --oat-50: 252 248 242;
+  --oat-100: 247 238 225;
+  --oat-200: 239 224 204;
+  --oat-300: 229 205 176;
+  --oat-400: 216 185 154; /* #D8B99A */
+  --oat-500: 196 159 119;
+  --oat-600: 169 132 94;
+
+  /* Bark — warm neutral text scale (700 = espresso, 500 = muted brown) */
+  --bark-50: 249 245 238;
+  --bark-100: 241 234 223;
+  --bark-200: 226 216 201;
+  --bark-300: 203 188 168;
+  --bark-400: 163 146 126;
+  --bark-500: 116 104 93; /* #74685D */
+  --bark-600: 93 83 74;
+  --bark-700: 73 61 52; /* #493D34 */
+  --bark-800: 57 48 42;
+  --bark-900: 41 34 29;
+
+  /* Shape */
+  --radius-card: 10px;
+  --radius-field: 8px;
+
+  /* Rhythm — shared by the layout helpers below */
+  --gutter: 1.25rem;
+  --measure: 72rem;
+}
+
+@media (min-width: 640px) {
+  :root {
+    --gutter: 2rem;
+  }
+}
+
 @layer base {
   html {
     -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
     scroll-behavior: smooth;
-    /* Offset anchor targets so the sticky navbar doesn't cover them. */
-    scroll-padding-top: 5rem;
+    /* Anchor targets clear the sticky masthead. */
+    scroll-padding-top: 6rem;
   }
 
   body {
-    @apply bg-white text-ink-700;
+    @apply bg-linen font-sans text-[0.95rem] leading-relaxed text-bark-600;
+    font-feature-settings: 'kern' 1;
   }
 
   h1,
   h2,
-  h3 {
-    @apply text-ink-900;
+  h3,
+  h4 {
+    @apply font-serif font-medium text-bark-700;
     text-wrap: balance;
   }
 
-  /* Consistent focus ring everywhere, keyboard-only. */
+  p {
+    text-wrap: pretty;
+  }
+
+  /* One focus treatment everywhere, keyboard only. */
   :focus-visible {
-    @apply outline-none ring-2 ring-brand-500/50 ring-offset-2 ring-offset-white;
+    @apply outline-none ring-2 ring-sage-500/60 ring-offset-2 ring-offset-linen;
+  }
+
+  ::selection {
+    @apply bg-oat-300 text-bark-800;
+  }
+
+  /* Photography is always warm-toned and never stretched. */
+  img {
+    @apply block max-w-full;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
   }
 }
 
 @layer components {
-  /* ---------- Layout ---------- */
+  /* ------------------------------------------------------------- layout */
   .shell {
-    @apply mx-auto w-full max-w-6xl px-4 sm:px-6;
+    @apply mx-auto w-full;
+    max-width: var(--measure);
+    padding-inline: var(--gutter);
   }
   .shell-narrow {
-    @apply mx-auto w-full max-w-3xl px-4 sm:px-6;
+    @apply mx-auto w-full max-w-3xl;
+    padding-inline: var(--gutter);
+  }
+  .shell-wide {
+    @apply mx-auto w-full max-w-[84rem];
+    padding-inline: var(--gutter);
   }
   .section {
-    @apply py-14 sm:py-20;
+    @apply py-16 sm:py-24;
   }
 
-  /* ---------- Buttons ---------- */
-  .btn {
-    @apply inline-flex select-none items-center justify-center gap-2 whitespace-nowrap rounded-xl
-           px-4 py-2.5 text-sm font-semibold transition-all duration-200
-           disabled:pointer-events-none disabled:opacity-50;
-  }
-  .btn-primary {
-    @apply btn bg-brand-600 text-white shadow-soft hover:-translate-y-px hover:bg-brand-700
-           hover:shadow-card active:translate-y-0;
-  }
-  .btn-secondary {
-    @apply btn bg-ink-900 text-white shadow-soft hover:-translate-y-px hover:bg-ink-800
-           hover:shadow-card active:translate-y-0;
-  }
-  .btn-outline {
-    @apply btn border border-ink-200 bg-white text-ink-700 hover:border-ink-300 hover:bg-ink-50;
-  }
-  .btn-ghost {
-    @apply btn text-ink-600 hover:bg-ink-100 hover:text-ink-900;
-  }
-  .btn-danger {
-    @apply btn border border-rose-200 bg-white text-rose-600 hover:border-rose-300 hover:bg-rose-50;
-  }
-  .btn-lg {
-    @apply px-5 py-3 text-base;
-  }
-  .btn-sm {
-    @apply rounded-lg px-3 py-1.5 text-xs;
+  /* A hairline in the warm neutral, used instead of grey borders. */
+  .rule {
+    @apply border-t border-bark-200/70;
   }
 
-  /* ---------- Forms ---------- */
-  .label {
-    @apply mb-1.5 block text-sm font-medium text-ink-800;
-  }
-  .input {
-    @apply w-full rounded-xl border border-ink-200 bg-white px-3.5 py-2.5 text-sm text-ink-900
-           shadow-soft transition-colors duration-200 placeholder:text-ink-400
-           hover:border-ink-300 focus:border-brand-500 focus:outline-none
-           focus:ring-2 focus:ring-brand-500/25;
-  }
-  select.input {
-    @apply cursor-pointer appearance-none bg-[length:1.1em] bg-[right_0.75rem_center] bg-no-repeat pr-10;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%236b7682' stroke-width='2'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
-  }
-  .hint {
-    @apply text-xs text-ink-400;
-  }
-
-  /* ---------- Surfaces ---------- */
+  /* ------------------------------------------------------------ surfaces */
   .card {
-    @apply rounded-2xl border border-ink-200/80 bg-white shadow-soft;
+    @apply rounded-card border border-bark-200/70 bg-paper;
   }
   .card-interactive {
-    @apply card transition-all duration-300 hover:-translate-y-1 hover:border-brand-200
-           hover:shadow-lift;
+    @apply card transition-all duration-300 ease-natural hover:-translate-y-0.5
+           hover:border-sage-300 hover:shadow-raise;
   }
-  .divider {
-    @apply border-t border-ink-200/70;
+  /* Secondary surface: oat-tinted, for asides and summaries. */
+  .panel {
+    @apply rounded-card border border-oat-200 bg-oat-50;
   }
 
-  /* ---------- Typography ---------- */
+  /* ------------------------------------------------------------- buttons */
+  .btn {
+    @apply inline-flex select-none items-center justify-center gap-2 whitespace-nowrap
+           rounded-full px-5 py-2.5 text-sm font-medium tracking-[0.005em]
+           transition-all duration-200 ease-natural
+           disabled:pointer-events-none disabled:opacity-45;
+  }
+  .btn-primary {
+    @apply btn bg-sage-600 text-paper hover:bg-sage-700 active:bg-sage-800;
+  }
+  .btn-accent {
+    @apply btn bg-terra-600 text-paper hover:bg-terra-700 active:bg-terra-800;
+  }
+  .btn-secondary {
+    @apply btn bg-bark-700 text-paper hover:bg-bark-800 active:bg-bark-900;
+  }
+  .btn-outline {
+    @apply btn border border-bark-300/80 bg-transparent text-bark-700
+           hover:border-bark-400 hover:bg-bark-100/60;
+  }
+  .btn-ghost {
+    @apply btn text-bark-600 hover:bg-bark-100/70 hover:text-bark-800;
+  }
+  .btn-danger {
+    @apply btn border border-terra-200 bg-transparent text-terra-700
+           hover:border-terra-300 hover:bg-terra-50;
+  }
+  .btn-lg {
+    @apply px-7 py-3.5 text-[0.95rem];
+  }
+  .btn-sm {
+    @apply px-3.5 py-1.5 text-xs;
+  }
+
+  /* A text link that reads as editorial rather than as a UI control. */
+  .link {
+    @apply font-medium text-sage-700 underline decoration-sage-300 decoration-1
+           underline-offset-4 transition-colors hover:text-sage-800 hover:decoration-sage-500;
+  }
+
+  /* --------------------------------------------------------------- forms */
+  .label {
+    @apply mb-2 block text-xs font-medium uppercase tracking-[0.11em] text-bark-500;
+  }
+  .input {
+    @apply w-full rounded-field border border-bark-200 bg-paper px-3.5 py-2.5 text-sm
+           text-bark-800 transition-colors duration-200 placeholder:text-bark-400
+           hover:border-bark-300 focus:border-sage-500 focus:outline-none
+           focus:ring-2 focus:ring-sage-500/25;
+  }
+  select.input {
+    @apply cursor-pointer appearance-none bg-[length:1em] bg-[right_0.85rem_center] bg-no-repeat pr-10;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2374685D' stroke-width='1.75'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  }
+  .hint {
+    @apply text-xs leading-relaxed text-bark-400;
+  }
+
+  /* ---------------------------------------------------------- typography */
   .eyebrow {
-    @apply text-xs font-semibold uppercase tracking-[0.14em] text-brand-700;
+    @apply font-sans text-[0.68rem] font-medium uppercase tracking-[0.2em] text-bark-500;
   }
   .h-display {
-    @apply text-4xl font-extrabold tracking-tighter text-ink-900 sm:text-5xl lg:text-[3.5rem] lg:leading-[1.05];
+    @apply font-serif text-display font-medium text-bark-700;
+  }
+  .h-title {
+    @apply font-serif text-title font-medium text-bark-700;
   }
   .h-section {
-    @apply text-2xl font-bold tracking-tight text-ink-900 sm:text-3xl;
+    @apply font-serif text-heading font-medium text-bark-700;
   }
   .lede {
-    @apply text-base leading-relaxed text-ink-500 sm:text-lg;
+    @apply max-w-prose text-[1.05rem] leading-[1.75] text-bark-500;
+  }
+  /* Long-form body copy: generous measure and leading. */
+  .prose-warm {
+    @apply max-w-prose text-[1rem] leading-[1.8] text-bark-600;
+  }
+  .prose-warm p + p {
+    @apply mt-5;
+  }
+
+  /* ---------------------------------------------------------- photography */
+  /* Warms and softens stock photography so it sits inside the palette. */
+  .photo {
+    @apply bg-oat-200 object-cover;
+    filter: saturate(0.9) contrast(1.02);
+  }
+  .photo-frame {
+    @apply overflow-hidden rounded-card bg-oat-200;
   }
 }

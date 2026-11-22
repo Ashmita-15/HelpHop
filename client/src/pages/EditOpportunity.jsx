@@ -10,8 +10,8 @@ export default function EditOpportunity() {
   const navigate = useNavigate();
 
   const [initialValues, setInitialValues] = useState(null);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     api
@@ -39,34 +39,36 @@ export default function EditOpportunity() {
     navigate('/dashboard', { replace: true });
   };
 
-  if (loading) return <Loading label="Loading opportunity…" />;
+  if (loading) return <Loading label="Fetching the listing…" />;
 
   if (!initialValues) {
     return (
-      <div className="shell-narrow space-y-4 py-20 text-center">
-        <Alert type="error">{error || 'Opportunity not found.'}</Alert>
+      <div className="shell-narrow space-y-6 py-24 text-center">
+        <Alert type="error">{error || 'We couldn’t find that opportunity.'}</Alert>
         <Link to="/dashboard" className="btn-outline">
           <Icon name="arrowLeft" className="h-4 w-4" />
-          Back to dashboard
+          Back to your desk
         </Link>
       </div>
     );
   }
 
   return (
-    <div className="shell-narrow py-10 sm:py-12">
+    <div className="shell-narrow py-12 sm:py-16">
       <PageHeader
-        eyebrow="Edit"
-        title="Edit opportunity"
-        description="Changes are visible to volunteers as soon as you save."
+        eyebrow="Editing"
+        title={initialValues.title}
+        description="Anything you change here is visible to volunteers as soon as you save."
       />
 
-      <OpportunityForm
-        initialValues={initialValues}
-        submitLabel="Save changes"
-        onSubmit={handleSubmit}
-        onCancel={() => navigate('/dashboard')}
-      />
+      <div className="mt-12">
+        <OpportunityForm
+          initialValues={initialValues}
+          submitLabel="Save changes"
+          onSubmit={handleSubmit}
+          onCancel={() => navigate('/dashboard')}
+        />
+      </div>
     </div>
   );
 }

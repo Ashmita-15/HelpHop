@@ -13,18 +13,20 @@ export default function CreateOpportunity() {
   };
 
   return (
-    <div className="shell-narrow py-10 sm:py-12">
+    <div className="shell-narrow py-12 sm:py-16">
       <PageHeader
-        eyebrow="New opportunity"
-        title="Post a volunteer opportunity"
-        description="It goes live on the board as soon as you publish — no review queue."
+        eyebrow="Something new"
+        title="Tell people what you need"
+        description="Three short sections. It goes up the moment you publish — there is no review queue and nothing to wait for."
       />
 
-      <OpportunityForm
-        submitLabel="Publish opportunity"
-        onSubmit={handleSubmit}
-        onCancel={() => navigate('/dashboard')}
-      />
+      <div className="mt-12">
+        <OpportunityForm
+          submitLabel="Publish it"
+          onSubmit={handleSubmit}
+          onCancel={() => navigate('/dashboard')}
+        />
+      </div>
     </div>
   );
 }

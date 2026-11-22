@@ -9,14 +9,14 @@ const ROLES = [
   {
     value: 'volunteer',
     icon: 'heart',
-    title: 'Volunteer',
-    blurb: 'Find shifts near you and sign up.',
+    title: 'I want to volunteer',
+    blurb: 'Find shifts nearby and claim a place.',
   },
   {
     value: 'organization',
     icon: 'building',
-    title: 'Organization',
-    blurb: 'Post shifts and track who joins.',
+    title: 'I run an organisation',
+    blurb: 'Post what you need and see who comes.',
   },
 ];
 
@@ -42,8 +42,8 @@ export default function Register() {
     e.preventDefault();
     setError('');
 
-    if (form.password.length < 6) return setError('Password must be at least 6 characters.');
-    if (form.password !== form.confirm) return setError('The two passwords do not match.');
+    if (form.password.length < 6) return setError('Your password needs at least 6 characters.');
+    if (form.password !== form.confirm) return setError('The two passwords don’t match.');
 
     setSubmitting(true);
     try {
@@ -64,18 +64,19 @@ export default function Register() {
 
   return (
     <AuthLayout
-      title="Create your account"
-      subtitle="Takes about a minute. No approval queue."
+      title="Join HelpHop"
+      subtitle="It takes about a minute, and there is no approval queue on the other side."
+      quote="“We put up one shift on a Tuesday. By Thursday there were nine of us.”"
       footer={
         <>
           Already have an account?{' '}
-          <Link to="/login" className="font-semibold text-brand-700 hover:underline">
-            Log in
+          <Link to="/login" className="link">
+            Sign in
           </Link>
         </>
       }
     >
-      <form onSubmit={handleSubmit} className="space-y-5" noValidate>
+      <form onSubmit={handleSubmit} className="space-y-7" noValidate>
         {error && (
           <Alert type="error" onDismiss={() => setError('')}>
             {error}
@@ -83,17 +84,17 @@ export default function Register() {
         )}
 
         <fieldset>
-          <legend className="label">I&apos;m signing up as a…</legend>
+          <legend className="label">Which of these is you?</legend>
           <div className="grid gap-3 sm:grid-cols-2">
             {ROLES.map((r) => {
               const active = form.role === r.value;
               return (
                 <label
                   key={r.value}
-                  className={`flex cursor-pointer flex-col gap-1 rounded-xl border p-4 transition-all duration-200 ${
+                  className={`flex cursor-pointer flex-col gap-1.5 rounded-card border p-4 transition-all duration-200 ease-natural ${
                     active
-                      ? 'border-brand-500 bg-brand-50/50 shadow-soft ring-1 ring-brand-500/30'
-                      : 'border-ink-200 bg-white hover:border-ink-300 hover:bg-ink-50/50'
+                      ? 'border-sage-500 bg-sage-50'
+                      : 'border-bark-200 bg-paper hover:border-bark-300'
                   }`}
                 >
                   <input
@@ -104,15 +105,11 @@ export default function Register() {
                     onChange={set('role')}
                     className="sr-only"
                   />
-                  <span
-                    className={`flex h-8 w-8 items-center justify-center rounded-lg ${
-                      active ? 'bg-brand-100 text-brand-700' : 'bg-ink-100 text-ink-500'
-                    }`}
-                  >
-                    <Icon name={r.icon} className="h-4 w-4" />
+                  <span className={active ? 'text-sage-600' : 'text-bark-400'}>
+                    <Icon name={r.icon} className="h-5 w-5" />
                   </span>
-                  <span className="mt-1 text-sm font-semibold text-ink-900">{r.title}</span>
-                  <span className="text-xs leading-relaxed text-ink-500">{r.blurb}</span>
+                  <span className="mt-1 font-serif text-base text-bark-700">{r.title}</span>
+                  <span className="text-xs leading-relaxed text-bark-500">{r.blurb}</span>
                 </label>
               );
             })}
@@ -121,12 +118,12 @@ export default function Register() {
 
         <div>
           <label className="label" htmlFor="name">
-            {isOrg ? 'Organization name' : 'Full name'}
+            {isOrg ? 'Organisation name' : 'Your name'}
           </label>
           <input
             id="name"
             className="input"
-            placeholder={isOrg ? 'Green Earth Collective' : 'Asha Verma'}
+            placeholder={isOrg ? 'Fairfield Allotments' : 'Asha Verma'}
             value={form.name}
             onChange={set('name')}
             required
@@ -149,7 +146,7 @@ export default function Register() {
           />
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-5 sm:grid-cols-2">
           <div>
             <label className="label" htmlFor="password">
               Password
@@ -167,14 +164,14 @@ export default function Register() {
           </div>
           <div>
             <label className="label" htmlFor="confirm">
-              Confirm password
+              Confirm it
             </label>
             <input
               id="confirm"
               type="password"
               autoComplete="new-password"
               className="input"
-              placeholder="Repeat it"
+              placeholder="Type it again"
               value={form.confirm}
               onChange={set('confirm')}
               required
@@ -184,7 +181,7 @@ export default function Register() {
 
         <button type="submit" className="btn-primary w-full" disabled={submitting}>
           {submitting && <Spinner className="h-4 w-4" />}
-          {submitting ? 'Creating account…' : 'Create account'}
+          {submitting ? 'Setting things up…' : 'Create my account'}
         </button>
       </form>
     </AuthLayout>

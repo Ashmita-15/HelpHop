@@ -3,6 +3,7 @@ import { Link, useParams, useSearchParams } from 'react-router-dom';
 
 import { api } from '../api/client.js';
 import QrScanner from '../components/QrScanner.jsx';
+import { Sprig } from '../components/Ornament.jsx';
 import { Alert, Icon, Loading, Spinner, formatDate } from '../components/ui.jsx';
 import { formatTimeRange } from '../lib/time.js';
 
@@ -68,7 +69,7 @@ export default function Checkin() {
       const token = tokenFromScan(text, id);
       if (!token) {
         setState('error');
-        setMessage('That QR is for a different event. Scan the one on this event’s screen.');
+        setMessage('That code belongs to a different event. Scan the one on this event’s screen.');
         setMode(null);
         return;
       }
@@ -78,7 +79,7 @@ export default function Checkin() {
     [id, submit]
   );
 
-  if (loading) return <Loading label="Loading event…" />;
+  if (loading) return <Loading label="Finding the event…" />;
 
   const retry = () => {
     setState('idle');
@@ -86,47 +87,49 @@ export default function Checkin() {
     setCode('');
   };
 
+  const timeRange = event ? formatTimeRange(event.startTime, event.endTime) : '';
+
   return (
-    <div className="shell-narrow py-12 sm:py-16">
+    <div className="shell-narrow py-14 sm:py-20">
       <div className="card mx-auto max-w-md overflow-hidden">
-        <div className="border-b border-ink-200/70 px-6 py-5 text-center">
-          <p className="eyebrow">Check in</p>
-          <h1 className="mt-1 text-xl font-bold tracking-tight text-ink-900">
+        <div className="border-b border-bark-200/70 bg-oat-50 px-6 py-7 text-center">
+          <Sprig className="mx-auto h-5 w-5 text-sage-500" />
+          <p className="eyebrow mt-3">You&apos;re here</p>
+          <h1 className="mt-2 font-serif text-xl leading-snug text-bark-700">
             {event?.title || 'This event'}
           </h1>
           {event && (
-            <p className="mt-1 text-sm text-ink-500">
+            <p className="mt-2 text-sm text-bark-500">
               {formatDate(event.date)}
-              {formatTimeRange(event.startTime, event.endTime)
-                ? ` · ${formatTimeRange(event.startTime, event.endTime)}`
-                : ''}
+              {timeRange ? ` · ${timeRange}` : ''}
             </p>
           )}
-          {event?.venue && <p className="mt-0.5 text-sm text-ink-500">{event.venue}</p>}
+          {event?.venue && <p className="mt-0.5 text-sm text-bark-500">{event.venue}</p>}
         </div>
 
-        <div className="px-6 py-6">
+        <div className="px-6 py-7">
           {state === 'working' && (
-            <div className="flex flex-col items-center gap-3 py-6 text-ink-500">
-              <Spinner className="h-6 w-6 text-brand-600" />
-              <p className="text-sm font-medium">Checking you in…</p>
+            <div className="flex flex-col items-center gap-3 py-8 text-bark-500">
+              <Spinner className="h-6 w-6 text-sage-600" />
+              <p className="font-serif text-sm italic">Marking you present…</p>
             </div>
           )}
 
           {state === 'done' && (
             <div className="text-center">
-              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-50 text-brand-600">
+              <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-sage-100 text-sage-700">
                 <Icon name="check" className="h-7 w-7" />
-              </div>
-              <h2 className="mt-4 text-lg font-bold text-ink-900">You&apos;re checked in</h2>
-              <p className="mt-2 text-sm text-ink-500">
-                Your certificate appears on your dashboard once the organizer completes the event.
+              </span>
+              <h2 className="mt-5 font-serif text-xl text-bark-700">That&apos;s you, checked in</h2>
+              <p className="mt-3 text-sm leading-relaxed text-bark-500">
+                {message || 'Thanks for coming.'} Your certificate will appear on your shelf once
+                the organiser closes the event.
               </p>
             </div>
           )}
 
           {state === 'error' && (
-            <div className="space-y-4">
+            <div className="space-y-5">
               <Alert type="error">{message}</Alert>
               <button type="button" className="btn-primary w-full" onClick={retry}>
                 Try again
@@ -135,27 +138,19 @@ export default function Checkin() {
           )}
 
           {state === 'idle' && (
-            <div className="space-y-5">
+            <div className="space-y-6">
               {!mode && (
                 <>
-                  <p className="text-center text-sm text-ink-600">
-                    The organizer has a QR code and a 6-digit code on screen. Use either one.
+                  <p className="text-center text-sm leading-relaxed text-bark-600">
+                    The organiser has a QR code and a six-digit number on screen. Either one works.
                   </p>
                   <div className="grid gap-2">
-                    <button
-                      type="button"
-                      className="btn-primary w-full"
-                      onClick={() => setMode('scan')}
-                    >
+                    <button type="button" className="btn-primary w-full" onClick={() => setMode('scan')}>
                       <Icon name="qr" className="h-4 w-4" />
                       Scan the QR code
                     </button>
-                    <button
-                      type="button"
-                      className="btn-outline w-full"
-                      onClick={() => setMode('code')}
-                    >
-                      Enter the 6-digit code
+                    <button type="button" className="btn-outline w-full" onClick={() => setMode('code')}>
+                      Type the six-digit number
                     </button>
                   </div>
                 </>
@@ -166,44 +161,48 @@ export default function Checkin() {
                   <QrScanner onResult={handleScan} />
                   <button
                     type="button"
-                    className="btn-outline btn-sm w-full"
+                    className="btn-ghost btn-sm w-full"
                     onClick={() => setMode('code')}
                   >
-                    Enter the code instead
+                    Type the number instead
                   </button>
                 </div>
               )}
 
               {mode === 'code' && (
                 <form
-                  className="space-y-3"
+                  className="space-y-4"
                   onSubmit={(e) => {
                     e.preventDefault();
                     if (/^\d{6}$/.test(code)) submit(code);
                   }}
                 >
-                  <label className="label" htmlFor="code">
-                    6-digit code
-                  </label>
-                  <input
-                    id="code"
-                    className="input text-center text-2xl font-semibold tracking-[0.4em]"
-                    inputMode="numeric"
-                    autoComplete="one-time-code"
-                    pattern="\d{6}"
-                    maxLength={6}
-                    placeholder="000000"
-                    value={code}
-                    onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                    autoFocus
-                  />
-                  <p className="hint">It changes every 30 seconds — type the one showing now.</p>
+                  <div>
+                    <label className="label text-center" htmlFor="code">
+                      Six-digit number
+                    </label>
+                    <input
+                      id="code"
+                      className="input text-center font-serif text-3xl tracking-[0.3em]"
+                      inputMode="numeric"
+                      autoComplete="one-time-code"
+                      pattern="\d{6}"
+                      maxLength={6}
+                      placeholder="000000"
+                      value={code}
+                      onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                      autoFocus
+                    />
+                    <p className="hint mt-2 text-center">
+                      It changes every thirty seconds — use the one showing now.
+                    </p>
+                  </div>
                   <button type="submit" className="btn-primary w-full" disabled={code.length !== 6}>
-                    Check in
+                    Check me in
                   </button>
                   <button
                     type="button"
-                    className="btn-outline btn-sm w-full"
+                    className="btn-ghost btn-sm w-full"
                     onClick={() => setMode('scan')}
                   >
                     Scan the QR instead
@@ -214,12 +213,12 @@ export default function Checkin() {
           )}
         </div>
 
-        <div className="flex gap-2 border-t border-ink-200/70 px-6 py-4">
-          <Link to="/dashboard" className="btn-outline btn-sm flex-1 justify-center">
-            Dashboard
+        <div className="flex gap-2 border-t border-bark-200/70 px-6 py-4">
+          <Link to="/dashboard" className="btn-ghost btn-sm flex-1 justify-center">
+            Your shelf
           </Link>
-          <Link to={`/opportunities/${id}`} className="btn-outline btn-sm flex-1 justify-center">
-            View event
+          <Link to={`/opportunities/${id}`} className="btn-ghost btn-sm flex-1 justify-center">
+            View the event
           </Link>
         </div>
       </div>

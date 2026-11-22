@@ -1,24 +1,29 @@
 import { Link } from 'react-router-dom';
+import { HandsMark } from './Ornament.jsx';
 
-/** Wordmark + mark. Used in the navbar and footer. */
-export default function Logo({ to = '/', onClick, tone = 'dark' }) {
-  const wordmark = tone === 'light' ? 'text-white' : 'text-ink-900';
+/**
+ * The wordmark. Set in the serif, with the drawn hands mark enclosed in a
+ * ring that fills in on hover — the one piece of brand motion in the app.
+ */
+export default function Logo({ to = '/', onClick, size = 'md' }) {
+  const text = size === 'sm' ? 'text-[1.1rem]' : 'text-[1.3rem]';
+  const ring = size === 'sm' ? 'h-8 w-8' : 'h-9 w-9';
 
   return (
-    <Link to={to} onClick={onClick} className="group flex items-center gap-2.5" aria-label="VolunteerConnect home">
-      <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-gradient shadow-soft transition-transform duration-300 group-hover:scale-105">
-        <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" aria-hidden="true">
-          <path
-            d="M12 20.5S4.5 15.8 4.5 10.4A4.4 4.4 0 0 1 12 7.6a4.4 4.4 0 0 1 7.5 2.8c0 5.4-7.5 10.1-7.5 10.1Z"
-            stroke="white"
-            strokeWidth="1.8"
-            strokeLinejoin="round"
-          />
-          <circle cx="12" cy="11" r="1.6" fill="white" />
-        </svg>
+    <Link
+      to={to}
+      onClick={onClick}
+      className="group inline-flex items-center gap-2.5"
+      aria-label="HelpHop — home"
+    >
+      <span
+        className={`${ring} flex items-center justify-center rounded-full border border-sage-400 text-sage-600
+                    transition-colors duration-300 ease-natural group-hover:bg-sage-600 group-hover:text-paper`}
+      >
+        <HandsMark className="h-[1.1rem] w-[1.1rem]" />
       </span>
-      <span className={`text-[1.05rem] font-bold tracking-tight ${wordmark}`}>
-        Volunteer<span className="text-brand-500">Connect</span>
+      <span className={`font-serif ${text} leading-none tracking-[-0.015em] text-bark-700`}>
+        Help<span className="text-sage-600">Hop</span>
       </span>
     </Link>
   );

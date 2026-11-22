@@ -33,18 +33,18 @@ export default function Login() {
 
   return (
     <AuthLayout
-      title="Welcome back"
-      subtitle="Log in to manage your shifts and sign-ups."
+      title="Good to see you again"
+      subtitle="Sign in to pick up where you left off."
       footer={
         <>
-          Don&apos;t have an account?{' '}
-          <Link to="/register" className="font-semibold text-brand-700 hover:underline">
-            Create one
+          New here?{' '}
+          <Link to="/register" className="link">
+            Create an account
           </Link>
         </>
       }
     >
-      <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+      <form onSubmit={handleSubmit} className="space-y-5" noValidate>
         {error && (
           <Alert type="error" onDismiss={() => setError('')}>
             {error}
@@ -85,20 +85,27 @@ export default function Login() {
 
         <button type="submit" className="btn-primary w-full" disabled={submitting}>
           {submitting && <Spinner className="h-4 w-4" />}
-          {submitting ? 'Logging in…' : 'Log in'}
+          {submitting ? 'Signing you in…' : 'Sign in'}
         </button>
       </form>
 
-      <div className="mt-6 rounded-xl border border-ink-200 bg-ink-50/70 px-4 py-3">
-        <p className="text-xs font-semibold text-ink-700">Demo accounts</p>
-        <p className="mt-1.5 text-xs leading-relaxed text-ink-500">
-          Volunteer <span className="font-medium text-ink-700">asha@volunteerconnect.dev</span>
-          <br />
-          Organization <span className="font-medium text-ink-700">green@volunteerconnect.dev</span>
-          <br />
-          Password <span className="font-medium text-ink-700">password123</span>
-        </p>
-        <p className="mt-1.5 text-xs text-ink-400">Available after running the seed script.</p>
+      <div className="panel mt-8 px-5 py-4">
+        <p className="eyebrow">Demo accounts</p>
+        <dl className="mt-3 space-y-1.5 text-xs leading-relaxed text-bark-500">
+          <div className="flex gap-2">
+            <dt className="w-24 shrink-0">Volunteer</dt>
+            <dd className="text-bark-700">asha@volunteerconnect.dev</dd>
+          </div>
+          <div className="flex gap-2">
+            <dt className="w-24 shrink-0">Organisation</dt>
+            <dd className="text-bark-700">green@volunteerconnect.dev</dd>
+          </div>
+          <div className="flex gap-2">
+            <dt className="w-24 shrink-0">Password</dt>
+            <dd className="text-bark-700">password123</dd>
+          </div>
+        </dl>
+        <p className="mt-3 text-xs text-bark-400">Available once the seed script has been run.</p>
       </div>
     </AuthLayout>
   );

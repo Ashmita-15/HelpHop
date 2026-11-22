@@ -1,17 +1,25 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 
 import { api } from '../api/client.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import OpportunityCard from '../components/OpportunityCard.jsx';
 import SearchFilters from '../components/SearchFilters.jsx';
-import { Alert, CardSkeleton, EmptyState, Icon, PageHeader } from '../components/ui.jsx';
+import { Sprig } from '../components/Ornament.jsx';
+import { Alert, CardSkeleton, EmptyState, Icon } from '../components/ui.jsx';
 
 const EMPTY_FILTERS = { search: '', category: 'All', location: '' };
 
 export default function Browse() {
   const { isOrganization } = useAuth();
-  const [filters, setFilters] = useState(EMPTY_FILTERS);
+  const [params, setParams] = useSearchParams();
+
+  // The cause tiles on the landing page link here with ?cause=Environment.
+  const [filters, setFilters] = useState(() => ({
+    ...EMPTY_FILTERS,
+    category: params.get('cause') || 'All',
+  }));
+
   const hasFilters = Object.values(filters).some((v) => v && v !== 'All');
   const [opportunities, setOpportunities] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -25,6 +33,16 @@ export default function Browse() {
       .then(({ categories: c }) => setCategories(c))
       .catch(() => {});
   }, []);
+
+  // Keep the URL in step with the chosen cause so the view can be shared.
+  useEffect(() => {
+    const current = params.get('cause') || 'All';
+    if (current === filters.category) return;
+    if (filters.category === 'All') setParams({}, { replace: true });
+    else setParams({ cause: filters.category }, { replace: true });
+    // `params`/`setParams` are stable enough here; the guard above stops loops.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters.category]);
 
   // Debounced so typing in the search box doesn't fire a request per keystroke.
   useEffect(() => {
@@ -62,67 +80,88 @@ export default function Browse() {
     [opportunities]
   );
 
-  return (
-    <div className="shell py-10 sm:py-12">
-      <PageHeader
-        eyebrow="Explore"
-        title="Volunteer opportunities"
-        description="Every shift local organizations are currently looking to fill."
-        actions={
-          isOrganization && (
-            <Link to="/opportunities/new" className="btn-primary">
-              <Icon name="plus" className="h-4 w-4" />
-              Post an opportunity
-            </Link>
-          )
-        }
-      />
+  // The first listing is given a wider, two-column treatment so the grid
+  // opens like a page rather than a dashboard.
+  const [lead, ...rest] = opportunities;
 
-      <SearchFilters
-        value={filters}
-        onChange={setFilters}
-        categories={categories}
-        locations={locations}
-        resultCount={loading ? null : opportunities.length}
-      />
+  return (
+    <div className="shell py-12 sm:py-16">
+      <header className="max-w-2xl">
+        <p className="eyebrow flex items-center gap-2">
+          <Sprig className="h-4 w-4 text-sage-500" />
+          Explore
+        </p>
+        <h1 className="h-title mt-5">Find something worth your time</h1>
+        <p className="lede mt-4">
+          Everything local organisations are asking for right now. Pick a cause, or just read
+          through and see what catches you.
+        </p>
+      </header>
+
+      {isOrganization && (
+        <div className="mt-8">
+          <Link to="/opportunities/new" className="btn-primary">
+            <Icon name="plus" className="h-4 w-4" />
+            Post an opportunity
+          </Link>
+        </div>
+      )}
+
+      <div className="mt-12">
+        <SearchFilters
+          value={filters}
+          onChange={setFilters}
+          categories={categories}
+          locations={locations}
+          resultCount={loading ? null : opportunities.length}
+        />
+      </div>
 
       {error && (
-        <div className="mt-6">
+        <div className="mt-8">
           <Alert type="error" onDismiss={() => setError('')}>
             {error}
           </Alert>
         </div>
       )}
 
-      <div className="mt-8">
+      <div className="mt-10">
         {loading ? (
-          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
             {[0, 1, 2, 3, 4, 5].map((i) => (
               <CardSkeleton key={i} />
             ))}
           </div>
         ) : opportunities.length === 0 ? (
           <EmptyState
-            icon="search"
-            title={hasFilters ? 'Nothing matches that yet' : 'Nothing coming up right now'}
+            title={hasFilters ? 'Nothing matches that just yet' : 'Nothing coming up right now'}
             message={
               hasFilters
-                ? 'Try a broader keyword, a different category, or clear the filters to see what else is on the board.'
-                : 'The board only shows events that are still to come. Check back soon — organizations post new shifts all the time.'
+                ? 'Try a broader word, a different cause, or clear what you have chosen and read through everything that is open.'
+                : 'The board only shows events still to come. Check back in a day or two — organisations post new shifts all the time.'
             }
             action={
               hasFilters ? (
                 <button type="button" className="btn-outline" onClick={() => setFilters(EMPTY_FILTERS)}>
-                  Clear filters
+                  Clear and show everything
                 </button>
-              ) : null
+              ) : (
+                <Link to="/about" className="btn-outline">
+                  Read about HelpHop
+                </Link>
+              )
             }
           />
         ) : (
-          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {opportunities.map((o) => (
-              <OpportunityCard key={o._id} opportunity={o} />
-            ))}
+          <div className="space-y-8">
+            <OpportunityCard opportunity={lead} featured />
+            {rest.length > 0 && (
+              <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
+                {rest.map((o) => (
+                  <OpportunityCard key={o._id} opportunity={o} />
+                ))}
+              </div>
+            )}
           </div>
         )}
       </div>

@@ -1,61 +1,60 @@
 import { Link } from 'react-router-dom';
-import { Icon } from './ui.jsx';
+import { Icon, Photo } from './ui.jsx';
+import { Sprig } from './Ornament.jsx';
+import { PHOTOS } from '../lib/imagery.js';
 
-const POINTS = [
-  'Every listing shows the date, place and spots left',
-  'Sign up in one click — no application forms',
-  'Organizations see exactly who is turning up',
-];
-
-/** Split layout shared by the login and register pages. */
-export default function AuthLayout({ title, subtitle, children, footer }) {
+/**
+ * Split layout shared by sign in and join. The photograph side is a real
+ * photograph rather than a feature list on a gradient, and it is dropped
+ * entirely below `lg` where it would only push the form down the page.
+ */
+export default function AuthLayout({ title, subtitle, children, footer, quote }) {
   return (
-    <div className="grid min-h-[calc(100vh-4rem)] lg:grid-cols-2">
-      {/* Form side */}
-      <div className="flex items-center justify-center px-4 py-12 sm:px-6">
-        <div className="w-full max-w-md animate-fade-up">
+    <div className="grid min-h-[calc(100vh-4.5rem)] lg:grid-cols-[1fr_0.95fr]">
+      {/* Form */}
+      <div className="flex items-center justify-center px-5 py-14 sm:px-8">
+        <div className="w-full max-w-md animate-rise">
           <Link
             to="/"
-            className="mb-8 inline-flex items-center gap-1.5 text-sm font-medium text-ink-500 transition-colors hover:text-ink-900"
+            className="inline-flex items-center gap-2 text-sm text-bark-500 transition-colors hover:text-bark-800"
           >
             <Icon name="arrowLeft" className="h-4 w-4" />
-            Back to home
+            Back to HelpHop
           </Link>
 
-          <h1 className="text-2xl font-bold tracking-tight text-ink-900 sm:text-3xl">{title}</h1>
-          <p className="mt-2 text-sm text-ink-500">{subtitle}</p>
+          <p className="eyebrow mt-10 flex items-center gap-2">
+            <Sprig className="h-3.5 w-3.5 text-sage-500" />
+            Welcome
+          </p>
+          <h1 className="h-title mt-4">{title}</h1>
+          <p className="mt-3 text-[0.95rem] leading-relaxed text-bark-500">{subtitle}</p>
 
-          <div className="mt-8">{children}</div>
+          <div className="mt-10">{children}</div>
 
-          {footer && <div className="mt-6 text-center text-sm text-ink-500">{footer}</div>}
+          {footer && <div className="mt-8 text-center text-sm text-bark-500">{footer}</div>}
         </div>
       </div>
 
-      {/* Marketing side — hidden on small screens where it would just be noise */}
-      <div className="relative hidden overflow-hidden bg-brand-gradient lg:flex lg:items-center">
-        <div className="relative px-12 py-16 xl:px-16">
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-white/70">
-            VolunteerConnect
+      {/* Photograph */}
+      <div className="relative hidden lg:block">
+        <Photo
+          id={PHOTOS.gardenBeds}
+          alt="Volunteers working among the raised beds of a community garden"
+          width={900}
+          ratio={3 / 4}
+          className="absolute inset-0 h-full w-full"
+          eager
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-bark-900/75 via-bark-900/15 to-transparent" />
+        <figcaption className="absolute inset-x-0 bottom-0 p-10 xl:p-14">
+          <Sprig className="h-6 w-6 text-oat-200" />
+          <p className="mt-5 max-w-sm font-serif text-xl leading-[1.45] text-paper">
+            {quote || '“Nobody here does very much. We just all do a little, at the same time.”'}
           </p>
-          <h2 className="mt-4 max-w-md text-3xl font-bold leading-tight tracking-tight text-white">
-            A noticeboard for people who show up.
-          </h2>
-          <p className="mt-4 max-w-md leading-relaxed text-white/80">
-            Local groups post the shifts they need filled. Neighbours claim the ones that fit.
-            That&apos;s the whole thing.
+          <p className="mt-4 text-sm text-oat-200">
+            Fairfield Allotments — one of the groups posting on HelpHop
           </p>
-
-          <ul className="mt-10 space-y-4">
-            {POINTS.map((p) => (
-              <li key={p} className="flex items-start gap-3 text-sm text-white/90">
-                <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-white/15">
-                  <Icon name="check" className="h-3 w-3" />
-                </span>
-                {p}
-              </li>
-            ))}
-          </ul>
-        </div>
+        </figcaption>
       </div>
     </div>
   );

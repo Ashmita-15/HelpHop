@@ -10,8 +10,8 @@ import { Alert, Badge, Icon, Spinner, formatDate } from './ui.jsx';
 const COLLAPSE_AFTER = 6;
 
 /**
- * A volunteer's finished events. Deliberately quieter than the upcoming cards —
- * this is a record of what happened, not something to act on.
+ * A volunteer's finished events. Deliberately quieter than the upcoming
+ * cards — this is a record of what happened, not something to act on.
  */
 export default function PreviousEvents({ events }) {
   const [expanded, setExpanded] = useState(false);
@@ -37,54 +37,51 @@ export default function PreviousEvents({ events }) {
   };
 
   return (
-    <section className="mt-10">
-      <h2 className="flex items-center gap-2 text-lg font-semibold tracking-tight text-ink-900">
-        <Icon name="clock" className="h-4 w-4 text-ink-400" />
-        Previous events
-      </h2>
-      <p className="mt-1 text-sm text-ink-500">
-        Shifts that have already happened, newest first.
-      </p>
+    <section className="mt-16">
+      <div className="border-b border-bark-200/70 pb-4">
+        <h2 className="font-serif text-xl text-bark-700">Where you’ve been</h2>
+        <p className="mt-1.5 text-sm text-bark-500">Everything that has already happened, newest first.</p>
+      </div>
 
       {error && (
-        <div className="mt-4">
+        <div className="mt-5">
           <Alert type="error" onDismiss={() => setError('')}>
             {error}
           </Alert>
         </div>
       )}
 
-      <ul className="card mt-4 divide-y divide-ink-200/70">
+      <ul className="divide-y divide-bark-200/70">
         {visible.map((event) => {
           const reward = event.attended ? gigLabel(event.gig) : null;
 
           return (
-            <li key={event._id} className="flex flex-wrap items-center gap-x-3 gap-y-2 px-5 py-4">
-              <div className="min-w-0 flex-1">
+            <li key={event._id} className="flex flex-wrap items-center gap-x-4 gap-y-3 py-5">
+              <div className="min-w-0 flex-1 basis-56">
                 <Link
                   to={`/opportunities/${event._id}`}
-                  className="truncate text-sm font-semibold text-ink-700 transition-colors hover:text-brand-700"
+                  className="font-serif text-base text-bark-700 transition-colors hover:text-sage-700"
                 >
                   {event.title}
                 </Link>
-                <p className="mt-0.5 truncate text-xs text-ink-500">
-                  {event.organizationId?.name || 'An organization'} ·{' '}
+                <p className="mt-1 truncate text-xs text-bark-500">
+                  {event.organizationId?.name || 'A local organisation'} ·{' '}
                   {formatDateWithTime(formatDate(event.date), event.startTime, event.endTime)}
                 </p>
               </div>
 
               {event.attended ? (
-                <Badge tone="brand" icon="check">
+                <Badge tone="sage" icon="check">
                   Attended
                 </Badge>
               ) : (
-                <span className="text-xs font-medium text-ink-400">Didn&apos;t attend</span>
+                <span className="text-xs text-bark-400">Didn&apos;t make it</span>
               )}
 
               {reward && (
-                <span className="flex items-center gap-1.5 text-sm font-semibold text-ink-700">
+                <span className="flex items-center gap-2 text-sm text-bark-700">
                   {reward}
-                  <Badge tone={event.gig.status === 'settled' ? 'brand' : 'amber'}>
+                  <Badge tone={event.gig.status === 'settled' ? 'sage' : 'oat'}>
                     {event.gig.status === 'settled' ? 'Received' : 'Awaiting'}
                   </Badge>
                 </span>
@@ -94,8 +91,8 @@ export default function PreviousEvents({ events }) {
                 <div className="flex items-center gap-1.5">
                   <Link
                     to={`/verify/${event.certificateCode}`}
-                    className="btn-outline btn-sm"
-                    title="Public verification page for this certificate"
+                    className="btn-ghost btn-sm"
+                    title="The public page anyone can use to verify this certificate"
                   >
                     <Icon name="shield" className="h-3.5 w-3.5" />
                     Verify
@@ -104,7 +101,7 @@ export default function PreviousEvents({ events }) {
                     type="button"
                     onClick={() => download(event)}
                     disabled={downloading === event.certificateId}
-                    className="btn-secondary btn-sm"
+                    className="btn-outline btn-sm"
                   >
                     {downloading === event.certificateId ? (
                       <Spinner className="h-3.5 w-3.5" />
@@ -121,12 +118,8 @@ export default function PreviousEvents({ events }) {
       </ul>
 
       {collapsible && (
-        <button
-          type="button"
-          onClick={() => setExpanded((v) => !v)}
-          className="btn-outline btn-sm mt-3"
-        >
-          {expanded ? 'Show fewer' : `Show previous events (${events.length})`}
+        <button type="button" onClick={() => setExpanded((v) => !v)} className="link mt-5 text-sm">
+          {expanded ? 'Show fewer' : `Show all ${events.length}`}
         </button>
       )}
     </section>
