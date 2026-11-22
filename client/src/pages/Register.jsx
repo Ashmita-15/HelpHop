@@ -139,7 +139,7 @@ export default function Register() {
             type="email"
             autoComplete="email"
             className="input"
-            placeholder="you@example.com"
+            placeholder="you@gmail.com"
             value={form.email}
             onChange={set('email')}
             required
