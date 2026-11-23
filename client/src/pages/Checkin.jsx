@@ -6,6 +6,7 @@ import QrScanner from '../components/QrScanner.jsx';
 import { Sprig } from '../components/Ornament.jsx';
 import { Alert, Icon, Loading, Spinner, formatDate } from '../components/ui.jsx';
 import { formatTimeRange } from '../lib/time.js';
+import { checkinOpen, formatCheckinOpens } from '../lib/checkin.js';
 
 /** The QR encodes a full check-in URL; a typed code is just six digits. */
 function tokenFromScan(text, opportunityId) {
@@ -88,6 +89,9 @@ export default function Checkin() {
   };
 
   const timeRange = event ? formatTimeRange(event.startTime, event.endTime) : '';
+  // Offering the scanner before the window opens just sends them to a camera
+  // and a 409. Tell them when to come back instead.
+  const tooEarly = !!event && !event.completedAt && !checkinOpen(event);
 
   return (
     <div className="shell-narrow py-14 sm:py-20">
@@ -137,7 +141,23 @@ export default function Checkin() {
             </div>
           )}
 
-          {state === 'idle' && (
+          {state === 'idle' && tooEarly && (
+            <div className="space-y-5 text-center">
+              <Alert type="info">
+                Check-in for this event opens{' '}
+                {formatCheckinOpens(event) || 'on the morning of the event'}.
+              </Alert>
+              <p className="text-sm leading-relaxed text-bark-500">
+                Come back then and the organiser will have a QR code and a six-digit number on
+                screen. It stays open until two days after the event finishes.
+              </p>
+              <Link to={`/opportunities/${id}`} className="btn-outline w-full justify-center">
+                View the event
+              </Link>
+            </div>
+          )}
+
+          {state === 'idle' && !tooEarly && (
             <div className="space-y-6">
               {!mode && (
                 <>

@@ -6,6 +6,7 @@ import { gigLabel } from '../lib/gig.js';
 import { formatDateWithTime } from '../lib/time.js';
 import { Sprig } from '../components/Ornament.jsx';
 import { hasEnded, untilEnd } from '../lib/eventTime.js';
+import { checkinOpen, formatCheckinOpens } from '../lib/checkin.js';
 import {
   Alert,
   Avatar,
@@ -80,6 +81,11 @@ export default function ManageEvent() {
 
   const completed = !!data?.opportunity?.completedAt;
 
+  // The API refuses to mint a code outside the check-in window, so asking for
+  // one before the event's day would only fill this page with an error. Work
+  // out the same answer here and show the organiser when the door opens.
+  const doorOpen = !!data?.opportunity && checkinOpen(data.opportunity);
+
   // Live roster: poll while the door is open, stop once the event is closed.
   useEffect(() => {
     if (completed) return undefined;
@@ -91,9 +97,9 @@ export default function ManageEvent() {
     if (completed) loadGigs();
   }, [completed, loadGigs]);
 
-  // Rotating check-in QR.
+  // Rotating check-in QR — only while the door is actually open.
   useEffect(() => {
-    if (completed) return undefined;
+    if (completed || !doorOpen) return undefined;
 
     let cancelled = false;
     const refresh = async () => {
@@ -114,7 +120,7 @@ export default function ManageEvent() {
       cancelled = true;
       clearInterval(t);
     };
-  }, [id, completed]);
+  }, [id, completed, doorOpen]);
 
   const toggle = async (row) => {
     setError('');
@@ -271,39 +277,76 @@ export default function ManageEvent() {
         {!completed && (
           <section className="card h-fit p-6 text-center lg:sticky lg:top-28">
             <Sprig className="mx-auto h-5 w-5 text-sage-500" />
-            <h2 className="mt-3 font-serif text-lg text-bark-700">Scan to check in</h2>
-            <p className="mt-2 text-sm leading-relaxed text-bark-500">
-              Put this on a screen at the door. It changes every thirty seconds, so a photo of it
-              is no use later.
-            </p>
 
-            <div className="mt-5 flex aspect-square items-center justify-center rounded-field border border-bark-200 bg-paper p-3">
-              {qrError ? (
-                <p className="px-4 text-sm text-terra-700">{qrError}</p>
-              ) : qr ? (
-                <img
-                  src={qr.qrDataUrl}
-                  alt="Check-in QR code"
-                  className="h-full w-full object-contain"
-                />
-              ) : (
-                <Spinner className="h-7 w-7 text-sage-600" />
-              )}
-            </div>
+            {doorOpen ? (
+              <>
+                <h2 className="mt-3 font-serif text-lg text-bark-700">Scan to check in</h2>
+                <p className="mt-2 text-sm leading-relaxed text-bark-500">
+                  Put this on a screen at the door. It changes every thirty seconds, so a photo of
+                  it is no use later.
+                </p>
 
-            <div className="panel mt-5 px-4 py-4">
-              <p className="eyebrow">Or read this out</p>
-              <p className="mt-2 font-serif text-3xl tracking-[0.25em] text-bark-700">
-                {qr?.code || '······'}
-              </p>
-              <p className="mt-2 text-xs leading-relaxed text-bark-500">
-                For anyone who can&apos;t scan — they type it in under Check in.
-              </p>
-            </div>
+                <div className="mt-5 flex aspect-square items-center justify-center rounded-field border border-bark-200 bg-paper p-3">
+                  {qrError ? (
+                    <p className="px-4 text-sm text-terra-700">{qrError}</p>
+                  ) : qr ? (
+                    <img
+                      src={qr.qrDataUrl}
+                      alt="Check-in QR code"
+                      className="h-full w-full object-contain"
+                    />
+                  ) : (
+                    <Spinner className="h-7 w-7 text-sage-600" />
+                  )}
+                </div>
 
-            <p className="mt-4 text-xs leading-relaxed text-bark-400">
-              People need to have claimed a place before they can check in.
-            </p>
+                <div className="panel mt-5 px-4 py-4">
+                  <p className="eyebrow">Or read this out</p>
+                  <p className="mt-2 font-serif text-3xl tracking-[0.25em] text-bark-700">
+                    {qr?.code || '······'}
+                  </p>
+                  <p className="mt-2 text-xs leading-relaxed text-bark-500">
+                    For anyone who can&apos;t scan — they type it in under Check in.
+                  </p>
+                </div>
+
+                <p className="mt-4 text-xs leading-relaxed text-bark-400">
+                  People need to have claimed a place before they can check in.
+                </p>
+              </>
+            ) : (
+              /* Showing a QR here before the window opens would hand the
+                 organiser a code the API then refuses, and the volunteer would
+                 be the one who saw the error. Say so plainly instead. */
+              <>
+                <h2 className="mt-3 font-serif text-lg text-bark-700">
+                  {ended ? 'Check-in has closed' : 'Check-in hasn’t opened yet'}
+                </h2>
+                <div className="panel mt-5 px-5 py-6">
+                  <Icon name="qr" className="mx-auto h-7 w-7 text-bark-300" />
+                  <p className="mt-4 text-sm leading-relaxed text-bark-500">
+                    {ended ? (
+                      <>
+                        This event finished more than two days ago, so the QR code and the
+                        six-digit number no longer work. You can still mark people present by
+                        hand in the list.
+                      </>
+                    ) : (
+                      <>
+                        The QR code and the six-digit number appear here from{' '}
+                        <span className="text-bark-700">
+                          {formatCheckinOpens(opportunity) || 'the morning of the event'}
+                        </span>
+                        , and stay usable until two days after it finishes.
+                      </>
+                    )}
+                  </p>
+                </div>
+                <p className="mt-4 text-xs leading-relaxed text-bark-400">
+                  Until then you can still see who has claimed a place.
+                </p>
+              </>
+            )}
           </section>
         )}
 

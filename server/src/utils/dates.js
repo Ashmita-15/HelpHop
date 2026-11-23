@@ -161,3 +161,49 @@ export const endOfToday = () => {
   d.setHours(23, 59, 59, 999);
   return d;
 };
+
+/* ------------------------------------------------------------------ check-in */
+
+/**
+ * How long after an event finishes a volunteer can still be checked in.
+ * Generous on purpose: an organiser who forgets to run the door on the day
+ * should still be able to put the attendance right afterwards.
+ */
+export const CHECKIN_TAIL_MS = 2 * 864e5;
+
+/**
+ * When check-in opens: midnight at the start of the event's own day, in the
+ * event's own timezone.
+ *
+ * The timezone matters. `date` is stored at exact UTC midnight, so reading it
+ * with the server's local getters (`new Date(date).setHours(0,0,0,0)`) lands
+ * on a different instant on a server in Kolkata than on one in UTC — and on a
+ * different instant again in the volunteer's browser. That disagreement is
+ * what let the dashboard offer a "Check in" button the API then refused.
+ * Resolving against the event's recorded offset gives one answer everywhere.
+ */
+export function checkinOpensAt(opportunity) {
+  if (!opportunity?.date) return null;
+  const offset =
+    readOffsetMinutes(opportunity.tzOffsetMinutes) ?? serverOffsetMinutes(opportunity.date);
+  return resolveInstant(opportunity.date, null, offset);
+}
+
+/** When check-in closes: the scheduled end, plus the tail above. */
+export function checkinClosesAt(opportunity) {
+  const ends = eventEndsAt(opportunity);
+  return ends ? new Date(ends.getTime() + CHECKIN_TAIL_MS) : null;
+}
+
+/** Both edges at once, for callers that want to explain the wait. */
+export function checkinWindow(opportunity) {
+  return { opensAt: checkinOpensAt(opportunity), closesAt: checkinClosesAt(opportunity) };
+}
+
+/** True while a check-in for this event would be accepted. */
+export function checkinOpen(opportunity, now = Date.now()) {
+  if (!opportunity || opportunity.completedAt) return false;
+  const { opensAt, closesAt } = checkinWindow(opportunity);
+  if (!opensAt || !closesAt) return false;
+  return now >= opensAt.getTime() && now <= closesAt.getTime();
+}

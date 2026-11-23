@@ -12,10 +12,13 @@ import mongoose from 'mongoose';
 process.env.JWT_SECRET = process.env.JWT_SECRET || 'smoke-test-secret';
 process.env.GEMINI_API_KEY = ''; // force the mock path so the test is offline-safe
 
-const { createApp } = await import('../src/app.js');
 
 let passed = 0;
 let failed = 0;
+
+/** 'YYYY-MM-DD', exactly what an <input type="date"> sends. */
+const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+const serverOffset = -new Date().getTimezoneOffset();
 
 function check(label, condition, detail = '') {
   if (condition) {
@@ -28,7 +31,12 @@ function check(label, condition, detail = '') {
 }
 
 const mongo = await MongoMemoryServer.create();
-await mongoose.connect(mongo.getUri('volunteerconnect_test'));
+// app.js connects lazily per request from MONGO_URI, so the in-memory server
+// has to be in the environment before the app is imported.
+process.env.MONGO_URI = mongo.getUri('volunteerconnect_test');
+await mongoose.connect(process.env.MONGO_URI);
+
+const { createApp } = await import('../src/app.js');
 
 const server = createApp().listen(0);
 const { port } = server.address();
@@ -418,11 +426,45 @@ try {
   });
   const futureId = futureEvt.body.opportunity._id;
   await call(`/opportunities/${futureId}/join`, { method: 'POST', token: volToken });
+
+  // The organisation used to be handed a working QR for an event weeks away,
+  // which the volunteer's scan then refused — so the person who saw the error
+  // was the one who had done nothing wrong. Minting is now refused up front.
   const futureTok = await call(`/opportunities/${futureId}/checkin-token`, { method: 'POST', token: orgToken });
+  check('minting a QR before the window → 409', futureTok.status === 409, `got ${futureTok.status}`);
+  check(
+    'the refusal says when check-in opens',
+    /opens on/i.test(futureTok.body?.message || ''),
+    futureTok.body?.message
+  );
   const earlyScan = await call(`/opportunities/${futureId}/checkin`, {
-    method: 'POST', token: volToken, body: { token: futureTok.body.token },
+    method: 'POST', token: volToken, body: { token: 'x'.repeat(12) },
   });
-  check('check-in before the event day → 409', earlyScan.status === 409, `got ${earlyScan.status}`);
+  check('check-in before the event day is refused', [401, 409].includes(earlyScan.status), `got ${earlyScan.status}`);
+
+  // The window has to be read in the event's own timezone. `date` is stored at
+  // exact UTC midnight, so a server that reads it with local getters opens the
+  // door at a different instant than the browser does — which is how a
+  // same-day event could be offered and then refused.
+  for (const [label, offset] of [['Kolkata', 330], ['Chicago', -360], ['UTC', 0]]) {
+    const tzEvt = await call('/opportunities', {
+      method: 'POST', token: orgToken,
+      body: {
+        title: `Today in ${label}`, description: 'x'.repeat(60), category: 'Community',
+        location: label, date: ymd(new Date()), startTime: '09:00', endTime: '17:00',
+        tzOffsetMinutes: offset, requiredVolunteers: 3, gig: { mode: 'none' },
+      },
+    });
+    const tzId = tzEvt.body?.opportunity?._id;
+    const tzTok = await call(`/opportunities/${tzId}/checkin-token`, { method: 'POST', token: orgToken });
+    check(`an event dated today in ${label} can mint a code → 200`, tzTok.status === 200, `got ${tzTok.status} ${tzTok.body?.message || ''}`);
+
+    await call(`/opportunities/${tzId}/join`, { method: 'POST', token: volToken });
+    const tzScan = await call(`/opportunities/${tzId}/checkin`, {
+      method: 'POST', token: volToken, body: { token: tzTok.body?.token },
+    });
+    check(`a volunteer can check in to today's ${label} event → 201`, tzScan.status === 201, `got ${tzScan.status} ${tzScan.body?.message || ''}`);
+  }
 
   console.log('\n▶ Manual attendance');
   const manual = await call(`/opportunities/${evtId}/attendance/${vol2.body.user?.id || vol2.body.user?._id}`, {
@@ -467,6 +509,21 @@ try {
   const foreignComplete = await call(`/opportunities/${evtId}/complete`, { method: 'POST', token: org2.body.token });
   check('another org cannot complete → 403', foreignComplete.status === 403, `got ${foreignComplete.status}`);
 
+  // Completion is gated on the event's real scheduled end, so the fixture has
+  // to have actually finished. It was created dated today with no end time,
+  // which means it runs until midnight — give it a window that has closed.
+  const windUp = await call(`/opportunities/${evtId}`, {
+    method: 'PUT', token: orgToken,
+    body: {
+      title: 'Park Clean-Up Day', description: 'x'.repeat(60), category: 'Environment',
+      location: 'Kolkata', date: ymd(new Date()), startTime: '00:00', endTime: '00:30',
+      tzOffsetMinutes: serverOffset, requiredVolunteers: 5,
+      gig: { mode: 'paid', amount: 500, currency: 'INR' },
+    },
+  });
+  check('the event can be given a window that has closed → 200', windUp.status === 200, `got ${windUp.status} ${windUp.body?.message || ''}`);
+  check('that event now reads as finished', new Date(windUp.body?.opportunity?.endsAt).getTime() < Date.now());
+
   const done = await call(`/opportunities/${evtId}/complete`, { method: 'POST', token: orgToken });
   check('owner can complete → 200', done.status === 200, `got ${done.status}`);
   check('one award per attendee', done.body?.awards === 2, `got ${done.body?.awards}`);
@@ -500,6 +557,15 @@ try {
   await call(`/opportunities/${otherEvt.body.opportunity._id}/attendance/${vol2.body.user?.id || vol2.body.user?._id}`, {
     method: 'PATCH', token: orgToken, body: { present: true },
   });
+  const windUpOther = await call(`/opportunities/${otherEvt.body.opportunity._id}`, {
+    method: 'PUT', token: orgToken,
+    body: {
+      title: 'Other event', description: 'x'.repeat(60), category: 'Health', location: 'Pune',
+      date: ymd(new Date()), startTime: '00:00', endTime: '00:30',
+      tzOffsetMinutes: serverOffset, requiredVolunteers: 3, gig: { mode: 'none' },
+    },
+  });
+  check('the no-gig event can be wound up → 200', windUpOther.status === 200, `got ${windUpOther.status}`);
   const noneDone = await call(`/opportunities/${otherEvt.body.opportunity._id}/complete`, { method: 'POST', token: orgToken });
   check("gig.mode 'none' issues no awards", noneDone.body?.awards === 0, `got ${noneDone.body?.awards}`);
   check("gig.mode 'none' still issues certificates", noneDone.body?.certificates === 1, `got ${noneDone.body?.certificates}`);
@@ -623,8 +689,11 @@ try {
   });
   check('end time without a start → 400', endOnly.status === 400, `got ${endOnly.status}`);
 
-  // The whole point of keeping the past rule day-based: an early event stays
-  // live for the rest of its day.
+  // These two checks previously asserted the opposite: that a 06:00-08:00
+  // event stayed live all day, because the past rule was day-based. Adding
+  // start and end times replaced that with a time-based rule — an event that
+  // finished at breakfast should not still be advertised at lunchtime — so
+  // the assertions now follow the end time. Changed deliberately, not relaxed.
   const earlyToday = await call('/opportunities', {
     method: 'POST', token: orgToken,
     body: mkWhen({ title: 'Dawn shift', startTime: '06:00', endTime: '08:00' }),
@@ -632,12 +701,25 @@ try {
   const earlyId = earlyToday.body.opportunity._id;
   const liveList = await call('/opportunities');
   check(
-    'an event that started at 06:00 today is still listed',
-    liveList.body.opportunities.some((o) => o._id === earlyId),
-    'the past rule went time-based — it must stay day-based'
+    'an event that finished at 08:00 today is no longer listed',
+    !liveList.body.opportunities.some((o) => o._id === earlyId),
+    'the past rule is time-based: it should drop out once endTime passes'
   );
+  const laterToday = await call('/opportunities', {
+    method: 'POST', token: orgToken,
+    body: mkWhen({ title: 'Evening shift', startTime: '23:00', endTime: '23:59' }),
+  });
+  const laterId = laterToday.body.opportunity._id;
+  const laterList = await call('/opportunities');
+  check(
+    'an event still to come later today is listed',
+    laterList.body.opportunities.some((o) => o._id === laterId),
+    'an event whose end time has not passed must stay live'
+  );
+  const joinLater = await call(`/opportunities/${laterId}/join`, { method: 'POST', token: vol3.body.token });
+  check('…and is joinable → 201', joinLater.status === 201, `got ${joinLater.status}`);
   const joinEarly = await call(`/opportunities/${earlyId}/join`, { method: 'POST', token: vol2.body.token });
-  check('…and is still joinable → 201', joinEarly.status === 201, `got ${joinEarly.status}`);
+  check('the finished dawn shift is no longer joinable → 409', joinEarly.status === 409, `got ${joinEarly.status}`);
 
   const timedDetail = await call(`/opportunities/${timedId}`);
   check('detail returns venue and times', timedDetail.body.opportunity.venue === 'Gate 3, Riverside Park'

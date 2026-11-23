@@ -16,7 +16,10 @@ export default function Login() {
 
   const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
 
-  if (!authLoading && user) return <Navigate to="/dashboard" replace />;
+  // Honour where they were headed. Signing in flips `user` before the
+  // handler's own navigate() runs, so without this the redirect below wins
+  // and a scanned check-in link — token and all — is dropped on the floor.
+  if (!authLoading && user) return <Navigate to={location.state?.from || '/dashboard'} replace />;
 
   const handleSubmit = async (e) => {
     e.preventDefault();

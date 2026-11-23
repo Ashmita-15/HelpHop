@@ -8,9 +8,15 @@ import GigAward from '../models/GigAward.js';
 import Certificate, { generateCertificateCode } from '../models/Certificate.js';
 import { asyncHandler, httpError } from '../middleware/error.js';
 import { mintCheckinToken, verifyCheckinToken } from '../utils/checkin.js';
-import { eventEndsAt, eventStartsAt, hasEnded } from '../utils/dates.js';
-
-const DAY_MS = 864e5;
+import {
+  checkinOpen,
+  checkinWindow,
+  eventEndsAt,
+  eventStartsAt,
+  hasEnded,
+  readOffsetMinutes,
+  serverOffsetMinutes,
+} from '../utils/dates.js';
 
 /**
  * The typed short code is only 6 digits, so without a limit someone could sit
@@ -59,23 +65,50 @@ async function findOwned(id, user, { withSecret = false } = {}) {
   return doc;
 }
 
-/** Check-in opens at midnight on the event date and closes 24h after it. */
+const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+/**
+ * An instant, written in the event's own local time — never the server's.
+ * A message saying "opens 00:00" has to mean midnight where the event is,
+ * or it reads as nonsense to the organiser standing at the door.
+ */
+function whenLabel(date, opportunity) {
+  const offset =
+    readOffsetMinutes(opportunity?.tzOffsetMinutes) ?? serverOffsetMinutes(date);
+  const d = new Date(date.getTime() + offset * 60_000);
+  const hh = String(d.getUTCHours()).padStart(2, '0');
+  const mm = String(d.getUTCMinutes()).padStart(2, '0');
+  return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]} at ${hh}:${mm}`;
+}
+
+/**
+ * Check-in runs from midnight on the event's own day until two days after it
+ * finishes. The window lives in utils/dates.js so this guard, the QR minting
+ * below and the browser all read the same rule — see checkinOpensAt for why
+ * the event's own timezone, and not the server's, decides when midnight is.
+ */
 function assertCheckinWindow(opportunity) {
   if (opportunity.completedAt) {
     throw httpError(409, 'This event has been completed — attendance is closed');
   }
-  const opens = new Date(opportunity.date);
-  opens.setHours(0, 0, 0, 0);
-  const now = Date.now();
+  if (checkinOpen(opportunity)) return;
 
-  if (now < opens.getTime()) throw httpError(409, "Check-in hasn't opened for this event yet");
-  if (now > opens.getTime() + 2 * DAY_MS) throw httpError(409, 'Check-in for this event has closed');
+  const { opensAt, closesAt } = checkinWindow(opportunity);
+  if (!opensAt || !closesAt) throw httpError(409, 'This event has no usable date');
+
+  if (Date.now() < opensAt.getTime()) {
+    throw httpError(409, `Check-in for this event opens on ${whenLabel(opensAt, opportunity)}`);
+  }
+  throw httpError(409, `Check-in for this event closed on ${whenLabel(closesAt, opportunity)}`);
 }
 
 // POST /api/opportunities/:id/checkin-token   (owning organization)
 export const checkinToken = asyncHandler(async (req, res) => {
   const doc = await findOwned(req.params.id, req.user, { withSecret: true });
-  if (doc.completedAt) throw httpError(409, 'This event has been completed');
+  // A code minted outside the window would be verified and then refused by
+  // the guard in `checkin`, so the organiser would be putting a QR on the
+  // door that blames the volunteer. Refuse it here instead.
+  assertCheckinWindow(doc);
 
   const { token, code, expiresAt } = mintCheckinToken(doc.checkinSecret, doc._id.toString());
   const origin = (process.env.CLIENT_ORIGIN || 'http://localhost:5173').split(',')[0].trim();
@@ -92,6 +125,12 @@ export const checkin = asyncHandler(async (req, res) => {
   const doc = await Opportunity.findById(req.params.id).select('+checkinSecret');
   if (!doc) throw httpError(404, 'Opportunity not found');
 
+  // The window comes first. Checking the token first meant a volunteer who
+  // followed a link to an event that had not opened yet was told their code
+  // had expired, which sent them back to the organiser for a fresh one that
+  // could not work either.
+  assertCheckinWindow(doc);
+
   const throttleKey = `${req.user._id}:${doc._id}`;
   assertNotLockedOut(throttleKey);
 
@@ -100,8 +139,6 @@ export const checkin = asyncHandler(async (req, res) => {
     throw httpError(401, 'That code has expired — check the organizer’s screen for the current one');
   }
   failedAttempts.delete(throttleKey);
-
-  assertCheckinWindow(doc);
 
   const registered = await Registration.exists({ volunteerId: req.user._id, opportunityId: doc._id });
   if (!registered) throw httpError(403, "You haven't joined this opportunity");

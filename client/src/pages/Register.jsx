@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, Navigate, useNavigate } from 'react-router-dom';
+import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 
 import { useAuth } from '../context/AuthContext.jsx';
 import AuthLayout from '../components/AuthLayout.jsx';
@@ -23,6 +23,7 @@ const ROLES = [
 export default function Register() {
   const { register, user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const [form, setForm] = useState({
     name: '',
@@ -36,7 +37,10 @@ export default function Register() {
 
   const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
 
-  if (!authLoading && user) return <Navigate to="/dashboard" replace />;
+  // Honour where they were headed. Signing in flips `user` before the
+  // handler's own navigate() runs, so without this the redirect below wins
+  // and a scanned check-in link — token and all — is dropped on the floor.
+  if (!authLoading && user) return <Navigate to={location.state?.from || '/dashboard'} replace />;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -53,7 +57,7 @@ export default function Register() {
         password: form.password,
         role: form.role,
       });
-      navigate('/dashboard', { replace: true });
+      navigate(location.state?.from || '/dashboard', { replace: true });
     } catch (err) {
       setError(err.message);
       setSubmitting(false);
@@ -139,7 +143,7 @@ export default function Register() {
             type="email"
             autoComplete="email"
             className="input"
-            placeholder="you@gmail.com"
+            placeholder="you@gmailxq.com"
             value={form.email}
             onChange={set('email')}
             required
